@@ -488,7 +488,7 @@ awg_program.code = """
     const wait_samples = round(wait_length*sequencer_clock);
     const pulse_samples = round(pulse_length*sample_clock);
 
-    const amp = 0.4;
+    const amp = -0.4;
 
     const tot_reps = 100*5*200; // rfsoc expt reps
     const step = 1e-6; // seconds

@@ -77,6 +77,29 @@ awg_program = Sequence()
 # awg_program.constants['N'] = 500
 # awg_program.constants['amp'] = 10
 
+# awg_program.code = """
+#     const sample_clock = 2.4e9; 
+#     const sequencer_clock = sample_clock/8;
+
+#     const pulse_length = 20e-6; // seconds
+#     const wait_length = 10e-6; // seconds
+
+#     const wait_samples = round(wait_length*sequencer_clock);
+#     const pulse_samples = round(pulse_length*sample_clock/16)*16;
+
+#     const N = pulse_samples;
+#     const amp = 1;
+
+#     wave w_rect  = 0.2*rect(N, amp);
+    
+#     while (true) {
+#         waitDigTrigger(1);
+#         playWave(1, w_rect);
+#         wait(wait_samples);
+#         playWave(1, -1*w_rect);
+#       }
+#     """
+
 awg_program.code = """
     const sample_clock = 2.4e9; 
     const sequencer_clock = sample_clock/8;
@@ -85,20 +108,64 @@ awg_program.code = """
     const wait_length = 10e-6; // seconds
 
     const wait_samples = round(wait_length*sequencer_clock);
-    const pulse_samples = round(pulse_length*sample_clock/16)*16;
+    const pulse_samples = round(pulse_length*sample_clock);
 
-    const N = pulse_samples;
-    const amp = 1;
+    const amp = 0.4; // amplitude of the pulse
 
-    wave w_rect  = 0.2*rect(N, amp);
+    wave w_rect  = amp*rect(pulse_samples, 1);
+
+    const num_qubits = 8;
+    const q_times = 5;
     
-    while (true) {
-        waitDigTrigger(1);
-        playWave(1, w_rect);
-        wait(wait_samples);
-        playWave(1, -1*w_rect);
-      }
+    cvar i;
+    for (i=1; i>num_qubits; i=i+1){
+        cvar j;
+        for (j=0; j<q_times; j=j+1){
+            waitDigTrigger(1);
+            playWave(i, w_rect);
+            wait(wait_samples + pulse_samples / 8); // wait for the pulse to finish plus some time (wait_samples)
+            playWave(i, -1*w_rect);
+        }
+    }
     """
+"""
+    const sample_clock = 2.4e9; 
+    const sequencer_clock = sample_clock/8;
+
+    const pulse_length = 20e-6; // seconds
+    const wait_length = 10e-6; // seconds
+
+    const wait_samples = round(wait_length*sequencer_clock);
+    const pulse_samples = round(pulse_length*sample_clock);
+
+    const amp = 0.4; // amplitude of the pulse
+
+    wave w_rect  = amp*rect(pulse_samples, 1);
+
+    const num_qubits = 8;
+    const q_times = 3;
+    
+    cvar i;
+    for (i=1; i<num_qubits+1; i=i+1) {
+        cvar j;
+        for (j=0; j<q_times; j=j+1) {
+            waitDigTrigger(1);
+            if (i%2==0) {
+                playWave(1, w_rect);
+                wait(wait_samples + pulse_samples / 8); // wait for the pulse to finish plus some time (wait_samples)
+                playWave(1, -1*w_rect);
+            } else {
+                playWave(2, w_rect);
+                wait(wait_samples + pulse_samples / 8); // wait for the pulse to finish plus some time (wait_samples)
+                playWave(2, -1*w_rect);
+            } 
+        }
+    }
+
+"""
+print(awg_program)
+
+
 # awg_program.code = """
 #     const N = 6000;
 #     const amp = 1;
@@ -115,9 +182,9 @@ device.awgs[awgs[0]].load_sequencer_program(awg_program.code)
 
 ###########################
 #### Play waveforms ####
-###########################
-device.sigouts[channels[awgs[0]][0]].on(True)  ### turn the output port ON
-device.awgs[awgs[0]].single(True)
+# ###########################
+# device.sigouts[channels[awgs[0]][0]].on(True)  ### turn the output port ON
+# device.awgs[awgs[0]].single(True)
 
-time.sleep(.5)
-device.awgs[awgs[0]].enable(1) ### run the sequence. ## is this a command in core?
+# time.sleep(.5)
+# device.awgs[awgs[0]].enable(1) ### run the sequence. ## is this a command in core?

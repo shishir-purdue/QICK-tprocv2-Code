@@ -7,7 +7,7 @@ The qubit drive pulse is swept in frequency and timing while the flux and readou
 
 TODO: This code is a work in progress and many values are still hardcoded below.
 
-Live plotting is setup.
+Live plotting is setup. No single shot yet.
 
 This experiment connects to the Zurich Instruments HDAWG. The IP addresses are
 defined below in the code.
@@ -88,7 +88,7 @@ def fast_flux_qubit_spec(q_time, ff_length):
                         pulse_style='gauss', pulse_name='qubit_pulse', suffix='_ge')
 
         def _body(self, cfg):
-            t_offset = ff_length + 1.5+0.02 # (ro delay, trig delay) time offset for the readout pulse (fixed)
+            t_offset = ff_length + 2+0.02 # (ro delay, trig delay) time offset for the readout pulse (fixed)
 
             if q_time < 0:
                 # if non-MUX then send readout configurations - useful when freq sweeping
@@ -97,7 +97,7 @@ def fast_flux_qubit_spec(q_time, ff_length):
                 self.pulse(ch=self.cfg['res_ch'], name="res_pulse", t=t_offset - q_time)
                 self.trigger(ros=[self.cfg['ro_ch']], pins=[0], t=self.cfg['trig_time']+t_offset)
 
-                self.trigger(pins=[1], t=np.abs(q_time))
+                self.trigger(pins=[1], t=np.abs(q_time), width=1)
                 self.pulse(ch=self.cfg["qubit_ch"], name="qubit_pulse", t=0.02)
             else:
                 # if non-MUX then send readout configurations - useful when freq sweeping
@@ -273,12 +273,17 @@ def set_awg_default(device=device,
             # channel.on(True)                # Turn on the outputs. Should be the last setting
     return awg_cores_i, channels_i
 
+# create channel list from number of cores
 channels = []
-awgs = [0, 1]
+awgs = [0, 1, 2, 3] # four cores for hdawg8 -> ideal operation is the 4x2 grouping (here)
 for i in awgs:
     awg_cores_i, channels_i = set_awg_default(awg_group=i, output_range=1.0)
     channels.append(channels_i)
 print(channels)
+
+# make sure channels are off
+for i in awgs:
+    device.awgs[i].enable(0)
 
 
 ###########################
@@ -286,47 +291,58 @@ print(channels)
 ###########################
 # sequencer programming and compilation for sequencer 1
 
-device.awgs[awgs[0]].enable(0)
-device.awgs[awgs[1]].enable(0)
-
+# code works for all cores, just need to change index and trig
 awg_program = Sequence()
-
+# !! HARDCODED !! - need to manually change index
 awg_program.code = """
     const sample_clock = 2.4e9; 
     const sequencer_clock = sample_clock/8;
 
-    const pulse_length = 20e-6; // seconds
+    const pulse_length = 3e-6; // seconds
     const wait_length = 10e-6; // seconds
 
     const wait_samples = round(wait_length*sequencer_clock);
     const pulse_samples = round(pulse_length*sample_clock);
 
-    const amp = 0.4; // amplitude of the pulse
+    const amp = 0.1; // amplitude of the pulse
 
     wave w_rect  = amp*rect(pulse_samples, 1);
+    const trig = 1; // always 1 for the odd trigger?
+    const index = 1; // if channel is odd => =1, else =2
     
     while (true) {
-        waitDigTrigger(1);
-        playWave(1, w_rect);
+        waitDigTrigger(trig);
+        playWave(index, w_rect);
         wait(wait_samples + pulse_samples / 8); // wait for the pulse to finish plus some time (wait_samples)
-        playWave(1, -1*w_rect);
+        playWave(index, -1*w_rect);
       }
     """
 
-device.awgs[awgs[0]].load_sequencer_program(awg_program.code)
 
 ###########################
 #### Play waveforms ####
 ###########################
-device.sigouts[channels[awgs[0]][0]].on(True)  ### turn the output port ON
-device.awgs[awgs[0]].single(True)
+num_pts = 51
+ff_length = 3 # fast flux length in us, you actually set this above in the code for the HDAWG sequence, need to make sure they match
+q_times = np.linspace(-1, ff_length + 2, num_pts) # in us
 
-time.sleep(.5)
-device.awgs[awgs[0]].enable(1) ### run the sequence. ## is this a command in core?
 
-q_times = np.linspace(-1, 10, 100) # in us
-ff_length = 20 # fast flux length in us
 for q_time in q_times:
-    fast_flux_qubit_spec(q_time, ff_length)
+
+    q = 0 # qubit index 
+    awg_index = int(q/2)
+    channel_index = q%2
+    device.awgs[awgs[awg_index]].load_sequencer_program(awg_program.code)
+    device.sigouts[channels[awgs[awg_index]][channel_index]].on(True)  ### turn the output port ON
+    device.awgs[awgs[awg_index]].single(True)
+    time.sleep(.5)
+    device.awgs[awgs[awg_index]].enable(1) ### run the sequence. ## is this a command in core?
+    
+
+    qubit_freqs = fast_flux_qubit_spec(q_time, ff_length)
     print('q_time = ' + str(q_time) + ' us')
 
+# make sure channels are off
+for i in awgs:
+    device.awgs[i].enable(0)
+    print('turned off awg ' + str(i))

@@ -72,6 +72,7 @@ def hist(data=None, plot=True, ran=1.0):
     tind=contrast.argmax()
     threshold=binsg[tind]
     fid = contrast[tind]
-    axs[2].set_title(f"Fidelity = {fid*100:.2f}%")
+    if plot == True:
+        axs[2].set_title(f"Fidelity = {fid*100:.2f}%")
 
     return fid, threshold, theta

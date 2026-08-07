@@ -135,7 +135,7 @@ def declare_pulse(expt_func, cfg, ch, usage = 'res', pulse_style = 'const', puls
                     envelope="ramp" + suffix, 
                     freq=cfg[usage + '_freq' + suffix], 
                     phase=cfg[usage + '_phase'],
-                    gain=cfg[usage + '_gain' + suffix] / 2, 
+                    gain=cfg['half_pi_gain'], 
                     )
     elif pulse_name == 'ramsey2':
         expt_func.add_gauss(ch=ch, name="ramp" + suffix, sigma=cfg['sigma' + suffix], length=cfg['sigma' + suffix]*5, even_length=True)
@@ -144,7 +144,7 @@ def declare_pulse(expt_func, cfg, ch, usage = 'res', pulse_style = 'const', puls
                     envelope="ramp" + suffix, 
                     freq=cfg[usage + '_freq' + suffix], 
                     phase=cfg[usage + '_phase'] + cfg['wait_time']*360*cfg['ramsey_freq'],
-                    gain=cfg[usage + '_gain' + suffix] / 2, 
+                    gain=cfg['half_pi_gain'], 
                     )
     else:
         if pulse_style == 'gauss': # for a gaussian pulse

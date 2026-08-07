@@ -87,7 +87,7 @@ dacs = [[dac_C5toC8, 1], [dac_C5toC8, 2],[dac_C5toC8, 3],[dac_C5toC8, 4],
 time.sleep(1)
 
 #V/s or mA/s
-dac_rate = 0.05
+dac_rate = 0.5 # Alex said 1.0 V/s is max (old was 0.05 V/s)
 
 # converts DAC units to current value
 def digit_to_curr(x):

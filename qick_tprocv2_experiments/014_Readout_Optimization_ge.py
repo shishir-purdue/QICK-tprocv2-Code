@@ -51,6 +51,8 @@ expt_name = "Readout_Optimization_ge"
 QubitIndex = QUBIT_INDEX
 Qubit = 'Q' + str(QubitIndex)
 
+print("Current Time =", datetime.datetime.now()) 
+
 exp_cfg = add_qubit_experiment(expt_cfg, expt_name, QubitIndex)
 q_config = all_qubit_state(system_config)
 config = {**q_config['Q' + str(QubitIndex)], **exp_cfg}
@@ -75,10 +77,10 @@ for freqs in range(config['freq_steps']):
         config['res_gain_ge'] = config['gain_start'] + config['gain_step_size']*gains
 
         ssp_g = SingleShotProgram_g(soccfg, reps=1, final_delay=config['relax_delay'], cfg=config)
-        iq_list_g = ssp_g.acquire(soc, soft_avgs=1, progress=False)
+        iq_list_g = ssp_g.acquire(soc, soft_avgs=1, progress=True)
 
         ssp_e = SingleShotProgram_e(soccfg, reps=1, final_delay=config['relax_delay'], cfg=config)
-        iq_list_e = ssp_e.acquire(soc, soft_avgs=1, progress=False)
+        iq_list_e = ssp_e.acquire(soc, soft_avgs=1, progress=True)
 
         if MUX == 'False':
             I_g = iq_list_g[0][0].T[0]
@@ -128,6 +130,8 @@ with SlabFile(data_path + '\\' + fname, 'a') as f:
     # formats config into file as a single line
     f.attrs['config'] = json.dumps(config)
     
+print("Current Time =", datetime.datetime.now()) 
+
 data = data_path + '\\' + fname
 
 

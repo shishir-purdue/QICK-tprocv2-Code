@@ -25,6 +25,9 @@ import os
 folder = os.getcwd()
 os.chdir(folder + '/qick_tprocv2_experiments')
 
+import sys
+print(sys.executable)
+
 from qick import *
 from qick.pyro import make_proxy
 
@@ -67,9 +70,9 @@ else: # non-MUX case
     config.update(
         [('mixer_freq', 6000),
         ('res_freq', 6025),
-        ('res_gain', 0.8), 
-        ('res_length', 0.5), 
-        ('ro_length', 1.5)])
+        ('res_gain', 1), 
+        ('res_length', 1), 
+        ('ro_length', 1)])
 
 print(config)
 
@@ -80,10 +83,12 @@ class LoopbackProgram(AveragerProgramV2):
     def _initialize(self, cfg):
         # initialize the readout channels and pulses for DAC and ADC
         initialize_ro_chs(self, cfg, suffix='')
+       
     
     def _body(self, cfg):
         # readout using proper configurations for MUX and non-MUX
         readout(self, cfg)
+       
 
 
 ###################

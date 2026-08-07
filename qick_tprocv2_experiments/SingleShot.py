@@ -138,4 +138,5 @@ if config['SS_ONLY'] == 'True':
         # formats config into file as a single line
         f.attrs['config'] = json.dumps(config)
 
+    
     data = data_path + '\\' + fname

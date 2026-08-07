@@ -45,7 +45,7 @@ from tqdm import tqdm
 from rfsoc_connect import *
 
 # ----- Experiment configurations ----- #
-expt_name = "res_spec_ge"
+expt_name = "res_spec_ge" # change to mux or ge depending on the experiment
 config, expt_name = initialize_configs(expt_name)
 print(expt_name + '\n')
 print(config)
@@ -120,11 +120,13 @@ if MUX == 'False': # non-MUX program
                     opts=dict(height=400, width=700, title='Resonator Spectroscopy', showlegend=True, xlabel='expt_pts'))
 
         amps = np.abs(expt_I + 1j*expt_Q)
+        phases = np.angle(expt_I + 1j*expt_Q)
         
     else:
         iq_list = prog.acquire(soc, soft_avgs = py_avg, progress=True)
         freqs = prog.get_pulse_param("res_pulse", "freq", as_array=True)
         amps = np.abs(iq_list[0][0].dot([1,1j]))
+        phases = np.angle(iq_list[0][0].dot([1,1j]))
 
     #####################################
     # ----- Saves data to a file ----- #
@@ -145,6 +147,7 @@ if MUX == 'False': # non-MUX program
         # - Adds data to the file - #
         f.append('fpts', freqs)
         f.append('amps', amps)
+        f.append('phases', phases)
         if IS_VISDOM:
             f.append('avgi', expt_I)
             f.append('avgq', expt_Q)

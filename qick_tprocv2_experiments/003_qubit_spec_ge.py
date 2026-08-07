@@ -89,7 +89,7 @@ class PulseProbeSpectroscopyProgram(AveragerProgramV2):
 
 qspec=PulseProbeSpectroscopyProgram(soccfg, reps=config['reps'], final_delay=config['relax_delay'], cfg=config)
 py_avg = config['py_avg']
-
+ 
 
 # for live plotting
 IS_VISDOM = True

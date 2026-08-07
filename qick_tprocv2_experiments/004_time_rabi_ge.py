@@ -4,7 +4,7 @@
 This experiment is used to perform time rabi experiment using a square pulse
 for a single qubit. The current experiment uses a for loop to sweep over the
 length of the pulse. This is because the trpoc and generator clock are 
-different, the timing of the pulse relative to length of pulse is not consistent.
+different, the timing of the  pulse relative to length of pulse is not consistent.
 Further development is needed to use the QickParam object to define the parameters
 of the experiment.
 
@@ -94,7 +94,6 @@ class LengthRabiProgram(AveragerProgramV2):
 ###################
 
 expt_pts=[config["start"] + ii*config["step"] for ii in range(config["expts"])]
-
 # for live plotting
 IS_VISDOM = True
 if IS_VISDOM:
@@ -112,6 +111,7 @@ for ii in range(py_avg):
     wait_times=[]
     pulse_lengths=[]
     for length in expt_pts:
+        #print('Experiment point: ' + str(length) + ' us')
         config["qubit_length_ge"]=length
 
         rabi=LengthRabiProgram(soccfg,

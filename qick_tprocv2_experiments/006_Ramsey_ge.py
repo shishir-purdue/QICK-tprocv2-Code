@@ -62,7 +62,7 @@ print(config)
 ##################
 # Define Program #
 ##################
-
+## Add the option to this with square pulses.
 class RamseyProgram(AveragerProgramV2):
     def _initialize(self, cfg):
         # initialize the readout channels and pulses for DAC and ADC
@@ -73,12 +73,13 @@ class RamseyProgram(AveragerProgramV2):
        # initialize the qubit generator channel
         declare_gen_ch(self, cfg, cfg['qubit_ch'], usage='qubit', suffix='_ge')
         # initialize qubit pulse
-        declare_pulse(self, cfg, cfg['qubit_ch'], usage='qubit', 
-                      pulse_style='gauss', pulse_name='ramsey1', suffix='_ge')
         
-        # initialize qubit pulse
         declare_pulse(self, cfg, cfg['qubit_ch'], usage='qubit', 
-                      pulse_style='gauss', pulse_name='ramsey2', suffix='_ge')
+                      pulse_style='gauss', pulse_name='ramsey1', suffix='_ge') 
+    
+        declare_pulse(self, cfg, cfg['qubit_ch'], usage='qubit', 
+                      pulse_style='gauss', pulse_name='ramsey2', suffix='_ge') 
+        
     
     def _body(self, cfg):
         self.pulse(ch=self.cfg["qubit_ch"], name="ramsey1", t=0)  #play probe pulse
@@ -86,7 +87,6 @@ class RamseyProgram(AveragerProgramV2):
         self.delay_auto(cfg['wait_time']+0.01, tag='wait') # wait_time after last pulse
         
         self.pulse(ch=self.cfg["qubit_ch"], name="ramsey2", t=0)  #play pulse
-
         self.delay_auto(0.01) # wait_time after last pulse
         
         # readout using proper configurations for MUX and non-MUX
@@ -100,7 +100,7 @@ ramsey=RamseyProgram(soccfg, reps=config['reps'], final_delay=config['relax_dela
 py_avg = config['py_avg']
 
 # for live plotting
-IS_VISDOM = True
+IS_VISDOM = True # has bugs
 if IS_VISDOM:
     expt_I = expt_Q = expt_mags = expt_phases = expt_pop = None
     viz = visdom.Visdom()

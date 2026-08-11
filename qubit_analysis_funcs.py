@@ -12,6 +12,7 @@ Dependencies
 - qualang_tools.plot.Fit
 - plotting_helpers (hist, SlabFile, array, etc.)
 - dsfit_copy (local copy of malab.dsfit; fithanger_new_withQc, hangerfunc_new_withQc)
+- circle_fit_dcm (notch-type circle fit, Diameter Correction Method)
 - scipy (for curve_fit in double-Gaussian fitting)
 
 Usage
@@ -35,6 +36,7 @@ from fitting import *
 from qualang_tools.plot import Fit
 from plotting_helpers import *
 from dsfit_copy import fithanger_new_withQc, hangerfunc_new_withQc
+from circle_fit_dcm import notch_circlefit, model_S21
 
 # Default color cycle for multi-trace plots
 COLORS = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'orange']
@@ -326,7 +328,8 @@ def analyze_time_of_flight(global_data_path, filename):
 
 
 def analyze_resonator_spectroscopy(global_data_path, filename,
-                                    fit_resonator=True, logscale=False):
+                                    fit_resonator=True, fit_method='circle',
+                                    logscale=False):
     """
     Single-resonator spectroscopy (amplitude + phase).
 
@@ -337,11 +340,16 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
     filename : str
         HDF5 filename, e.g. "00000_res_spec_ge_Q1_2026-06-06.h5".
     fit_resonator : bool
-        If True, fit the hanger-with-asymmetry lineshape
-        (``hangerfunc_new_withQc`` from dsfit_copy). The fit itself always
-        runs in log (dB) scale, since that's what the hanger formula
-        expects; the resulting curve is converted back to linear scale
-        for display unless ``logscale=True``.
+        If True, fit the resonator lineshape using ``fit_method``.
+    fit_method : str
+        "circle" (default) - notch-type circle fit using the Diameter
+            Correction Method (``circle_fit_dcm.notch_circlefit``), fit
+            directly to the complex avgi/avgq data. This is the standard
+            method for extracting Qi/Qc/Ql and correctly accounts for
+            impedance-mismatch asymmetry and cable delay.
+        "hanger" - hanger-with-asymmetry lineshape fit
+            (``hangerfunc_new_withQc`` from dsfit_copy), fit in dB scale
+            to the amplitude data only.
     logscale : bool
         If True, plot the amplitude data and fit in dB (log) scale instead
         of linear a.u.
@@ -353,6 +361,8 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
         freqs = array(f['fpts'])[0]
         amps = array(f['amps'])[0]
         phases = array(f['phases'])[0]
+        avgi = array(f['avgi'])[0]
+        avgq = array(f['avgq'])[0]
         config = _load_config(f)
 
     amps_db = 20 * np.log10(amps)
@@ -365,25 +375,53 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
     plt.title(f"Resonator Spectroscopy, Gain = {config['res_gain_ge']}")
 
     if fit_resonator:
-        # hangerfunc_new_withQc fits in dB, so fit on the log-scale data
-        # regardless of the display scale, then undo the log for a linear
-        # display curve via the inverse of the dB equation (amp = 10**(dB/20)).
-        f0, Qi, Qc, df, scale = fithanger_new_withQc(freqs, amps_db, showfit=False)
         freqs_fit = np.linspace(freqs[0], freqs[-1], 1000)
-        fit_curve_db = hangerfunc_new_withQc([f0, Qi, Qc, df, scale], freqs_fit)
-        fit_curve = fit_curve_db if logscale else 10 ** (fit_curve_db / 20)
 
-        plt.plot(freqs_fit, fit_curve, c='red', label='fit')
-        plt.axvline(f0, c='red', linestyle='--', label=f'fit f0: {f0:.3f}')
-        plt.axvline(freqs[np.argmin(amps)], c='blue', linestyle='--',
-                    label=f"min amp: {freqs[np.argmin(amps)]:.3f}")
-        print(f"  Min amp at {freqs[np.argmin(amps)]} MHz")
-        print("  Hanger fit results:")
-        print(f"    f0 = {f0:.4f} MHz")
-        print(f"    Qi = {Qi:.1f}")
-        print(f"    Qc = {Qc:.1f}")
-        print(f"    df = {df:.4f} MHz")
-        print(f"    scale = {scale:.4f}")
+        if fit_method == 'circle':
+            # Diameter Correction Method circle fit on the complex S21 data.
+            z_data = avgi + 1j * avgq
+            fit = notch_circlefit(freqs, z_data, correct_delay=True)
+            fit_curve_lin = np.abs(model_S21(freqs_fit, fit['fr'], fit['Ql'],
+                                              fit['Qc'], fit['phi0'],
+                                              fit['P_off'], fit['delay']))
+            fit_curve = 20 * np.log10(fit_curve_lin) if logscale else fit_curve_lin
+            f0 = fit['fr']
+
+            plt.plot(freqs_fit, fit_curve, c='red', label='fit')
+            plt.axvline(f0, c='red', linestyle='--', label=f'fit f0: {f0:.3f}')
+            plt.axvline(freqs[np.argmin(amps)], c='blue', linestyle='--',
+                        label=f"min amp: {freqs[np.argmin(amps)]:.3f}")
+            print(f"  Min amp at {freqs[np.argmin(amps)]} MHz")
+            print("  Circle fit (DCM) results:")
+            print(f"    f0 = {fit['fr']:.4f} MHz")
+            print(f"    Ql = {fit['Ql']:.1f}")
+            print(f"    Qc = {fit['Qc']:.1f}")
+            print(f"    Qi = {fit['Qi']:.1f}")
+            print(f"    phi0 = {fit['phi0']:.4f} rad")
+            print(f"    delay = {fit['delay']:.4f} us")
+
+        elif fit_method == 'hanger':
+            # hangerfunc_new_withQc fits in dB, so fit on the log-scale data
+            # regardless of the display scale, then undo the log for a linear
+            # display curve via the inverse of the dB equation (amp = 10**(dB/20)).
+            f0, Qi, Qc, df, scale = fithanger_new_withQc(freqs, amps_db, showfit=False)
+            fit_curve_db = hangerfunc_new_withQc([f0, Qi, Qc, df, scale], freqs_fit)
+            fit_curve = fit_curve_db if logscale else 10 ** (fit_curve_db / 20)
+
+            plt.plot(freqs_fit, fit_curve, c='red', label='fit')
+            plt.axvline(f0, c='red', linestyle='--', label=f'fit f0: {f0:.3f}')
+            plt.axvline(freqs[np.argmin(amps)], c='blue', linestyle='--',
+                        label=f"min amp: {freqs[np.argmin(amps)]:.3f}")
+            print(f"  Min amp at {freqs[np.argmin(amps)]} MHz")
+            print("  Hanger fit results:")
+            print(f"    f0 = {f0:.4f} MHz")
+            print(f"    Qi = {Qi:.1f}")
+            print(f"    Qc = {Qc:.1f}")
+            print(f"    df = {df:.4f} MHz")
+            print(f"    scale = {scale:.4f}")
+
+        else:
+            raise ValueError(f"Unknown fit_method: {fit_method!r} (use 'circle' or 'hanger')")
 
     plt.legend()
     _stamp_data_path(data)

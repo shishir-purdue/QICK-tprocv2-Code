@@ -11,6 +11,7 @@ Dependencies
 - fitting (lab fitting library: fitdecaysin, etc.)
 - qualang_tools.plot.Fit
 - plotting_helpers (hist, SlabFile, array, etc.)
+- dsfit_copy (local copy of malab.dsfit; fithanger_new_withQc, hangerfunc_new_withQc)
 - scipy (for curve_fit in double-Gaussian fitting)
 
 Usage
@@ -33,6 +34,7 @@ import pprint as pp
 from fitting import *
 from qualang_tools.plot import Fit
 from plotting_helpers import *
+from dsfit_copy import fithanger_new_withQc, hangerfunc_new_withQc
 
 # Default color cycle for multi-trace plots
 COLORS = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'orange']
@@ -50,6 +52,14 @@ def _build_path(global_data_path, filename):
 def _load_config(slab_file_handle):
     """Extract and parse the JSON config from an open SlabFile."""
     return json.loads(slab_file_handle.attrs['config'])
+
+
+def _stamp_data_path(data_path, fig=None):
+    """Print the source data path in small text at the bottom of the figure."""
+    if fig is None:
+        fig = plt.gcf()
+    fig.subplots_adjust(bottom=0.22)
+    fig.text(0.5, 0.02, data_path, ha='center', va='bottom', fontsize=7, color='black')
 
 
 def _normalize_population(I, Q, Ig, Qg, Ie, Qe,
@@ -311,11 +321,12 @@ def analyze_time_of_flight(global_data_path, filename):
     plt.ylabel("ADC Units")
     plt.xlabel("us")
     plt.title("Time of Flight Experiment")
+    _stamp_data_path(data)
     plt.show()
 
 
 def analyze_resonator_spectroscopy(global_data_path, filename,
-                                    fit_resonator=True):
+                                    fit_resonator=True, logscale=False):
     """
     Single-resonator spectroscopy (amplitude + phase).
 
@@ -326,7 +337,14 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
     filename : str
         HDF5 filename, e.g. "00000_res_spec_ge_Q1_2026-06-06.h5".
     fit_resonator : bool
-        If True, run a Lorentzian reflection fit via qualang_tools.
+        If True, fit the hanger-with-asymmetry lineshape
+        (``hangerfunc_new_withQc`` from dsfit_copy). The fit itself always
+        runs in log (dB) scale, since that's what the hanger formula
+        expects; the resulting curve is converted back to linear scale
+        for display unless ``logscale=True``.
+    logscale : bool
+        If True, plot the amplitude data and fit in dB (log) scale instead
+        of linear a.u.
     """
     data = _build_path(global_data_path, filename)
     print(f"Data path: {data}")
@@ -337,24 +355,38 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
         phases = array(f['phases'])[0]
         config = _load_config(f)
 
+    amps_db = 20 * np.log10(amps)
+
     # --- Amplitude plot ---
     plt.figure(figsize=(12, 6))
-    plt.plot(freqs, amps, marker='o', label='data')
-    plt.ylabel("a.u.")
+    plt.plot(freqs, amps_db if logscale else amps, marker='o', label='data')
+    plt.ylabel("dB" if logscale else "a.u.")
     plt.xlabel("Resonator Frequency (MHz)")
     plt.title(f"Resonator Spectroscopy, Gain = {config['res_gain_ge']}")
 
     if fit_resonator:
-        fit = Fit()
-        fit_results = fit.reflection_resonator_spectroscopy(freqs, amps, plot=True)
-        plt.axvline(fit_results['f'][0], c='red', linestyle='--', label='fit')
+        # hangerfunc_new_withQc fits in dB, so fit on the log-scale data
+        # regardless of the display scale, then undo the log for a linear
+        # display curve via the inverse of the dB equation (amp = 10**(dB/20)).
+        f0, Qi, Qc, df, scale = fithanger_new_withQc(freqs, amps_db, showfit=False)
+        freqs_fit = np.linspace(freqs[0], freqs[-1], 1000)
+        fit_curve_db = hangerfunc_new_withQc([f0, Qi, Qc, df, scale], freqs_fit)
+        fit_curve = fit_curve_db if logscale else 10 ** (fit_curve_db / 20)
+
+        plt.plot(freqs_fit, fit_curve, c='red', label='fit')
+        plt.axvline(f0, c='red', linestyle='--', label=f'fit f0: {f0:.3f}')
         plt.axvline(freqs[np.argmin(amps)], c='blue', linestyle='--',
                     label=f"min amp: {freqs[np.argmin(amps)]:.3f}")
-        print(f"  Min amp at {freqs[np.argmin(amps)]:.3f} MHz")
-        print("  Fit results:")
-        pp.pprint(fit_results)
+        print(f"  Min amp at {freqs[np.argmin(amps)]} MHz")
+        print("  Hanger fit results:")
+        print(f"    f0 = {f0:.4f} MHz")
+        print(f"    Qi = {Qi:.1f}")
+        print(f"    Qc = {Qc:.1f}")
+        print(f"    df = {df:.4f} MHz")
+        print(f"    scale = {scale:.4f}")
 
     plt.legend()
+    _stamp_data_path(data)
     plt.show()
 
     # --- Phase plot ---
@@ -363,6 +395,7 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
     plt.ylabel("radians")
     plt.xlabel("Resonator Frequency (MHz)")
     plt.title("Resonator Spectroscopy Phase")
+    _stamp_data_path(data)
     plt.show()
 
 
@@ -431,6 +464,7 @@ def analyze_qubit_spectroscopy(global_data_path, filename,
     pp.pprint(fit_results)
 
     plt.legend()
+    _stamp_data_path(data)
     plt.show()
 
 
@@ -509,6 +543,7 @@ def analyze_length_rabi(global_data_path, filename,
     plt.axvline(peak, linestyle='--', c='red',
                 label=f'pi pulse: {peak:.3f} us')
     plt.legend()
+    _stamp_data_path(data)
     plt.show()
 
 
@@ -591,6 +626,7 @@ def analyze_amplitude_rabi(global_data_path, filename,
                 label=f'pi/2 pulse: {half_pi:.3f} DAC')
     plt.title(f"Amplitude Rabi Oscillations (Sigma = {config['sigma_ge']:.2f})")
     plt.legend()
+    _stamp_data_path(data)
     plt.show()
 
 
@@ -673,6 +709,7 @@ def analyze_t2_ramsey(global_data_path, filename,
     plt.axhline(offset, color='black', linestyle='--',
                 label=f"offset: {offset:.3f}")
     plt.legend()
+    _stamp_data_path(data)
     plt.show()
 
     # Corrected qubit frequency
@@ -737,6 +774,7 @@ def analyze_t2_spin_echo(global_data_path, filename,
     fit_results = fit.ramsey(delay_times, ydata, plot=True)
     print("  Spin echo fit results:")
     pp.pprint(fit_results)
+    _stamp_data_path(data)
     plt.show()
 
 
@@ -798,6 +836,7 @@ def analyze_t1(global_data_path, filename,
     fit_results = fit.T1(x_ns, ydata, plot=True)
     print("  T1 fit results:")
     pp.pprint(fit_results)
+    _stamp_data_path(data)
     plt.show()
 
 
@@ -853,6 +892,7 @@ def analyze_single_shot(global_data_path, filename,
     plt.ylabel("Q")
     plt.legend()
     plt.axis('square')
+    _stamp_data_path(data)
     plt.show()
 
     # g-e fidelity
@@ -1023,6 +1063,7 @@ def analyze_readout_optimization(global_data_path, filename,
     elif ef:
         plt.title("Fidelity, Discriminate e-f")
     plt.colorbar(figA)
+    _stamp_data_path(data)
     plt.show()
 
     # Print optimal point
@@ -1097,6 +1138,7 @@ def inspect_readout_optimization_point(global_data_path, filename,
     plt.ylabel("Q")
     plt.legend()
     plt.axis('square')
+    _stamp_data_path(data)
     plt.show()
 
     print(f"  Gain:      {gain_val} (index {gain_index})")

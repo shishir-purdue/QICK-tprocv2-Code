@@ -293,7 +293,7 @@ def _plot_ge_calibration(Ig, Qg, Ie, Qe, title_prefix=""):
 #  Experiment functions
 # =============================================================================
 
-def analyze_time_of_flight(global_data_path, filename):
+def analyze_time_of_flight(global_data_path, filename, show_plot=True):
     """
     Time-of-flight measurement.
 
@@ -305,6 +305,8 @@ def analyze_time_of_flight(global_data_path, filename):
         Root directory for all data files.
     filename : str
         HDF5 filename, e.g. "00000_tof_Q1_2026-06-06.h5".
+    show_plot : bool
+        If True, add a legend and display the figure.
 
     Returns
     -------
@@ -324,19 +326,21 @@ def analyze_time_of_flight(global_data_path, filename):
     plt.plot(t, I, label="I value")
     plt.plot(t, Q, label="Q value")
     plt.plot(t, np.abs(I + 1j * Q), label="magnitude")
-    plt.legend()
+    if show_plot:
+        plt.legend()
     plt.ylabel("ADC Units")
     plt.xlabel("us")
     plt.title("Time of Flight Experiment")
     _stamp_data_path(data)
-    plt.show()
+    if show_plot:
+        plt.show()
 
     return fig
 
 
 def analyze_resonator_spectroscopy(global_data_path, filename,
                                     fit_resonator=True, fit_method='circle',
-                                    logscale=False):
+                                    logscale=False, show_plot=True):
     """
     Single-resonator spectroscopy (amplitude + phase).
 
@@ -360,6 +364,8 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
     logscale : bool
         If True, plot the amplitude data and fit in dB (log) scale instead
         of linear a.u.
+    show_plot : bool
+        If True, add a legend and display both figures.
 
     Returns
     -------
@@ -435,9 +441,11 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
         else:
             raise ValueError(f"Unknown fit_method: {fit_method!r} (use 'circle' or 'hanger')")
 
-    plt.legend()
+    if show_plot:
+        plt.legend()
     _stamp_data_path(data)
-    plt.show()
+    if show_plot:
+        plt.show()
 
     # --- Phase plot ---
     fig_phase = plt.figure(figsize=(12, 6))
@@ -446,14 +454,15 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
     plt.xlabel("Resonator Frequency (MHz)")
     plt.title("Resonator Spectroscopy Phase")
     _stamp_data_path(data)
-    plt.show()
+    if show_plot:
+        plt.show()
 
     return fig_amp, fig_phase
 
 
 def analyze_qubit_spectroscopy(global_data_path, filename,
                                 SS=False, ef=False, dac=0.0,
-                                plot_cal=False):
+                                plot_cal=False, show_plot=True):
     """
     Single-qubit spectroscopy.
 
@@ -471,6 +480,8 @@ def analyze_qubit_spectroscopy(global_data_path, filename,
         DAC current in mA (for plot labelling).
     plot_cal : bool
         If True (and SS=True), plot the g/e calibration IQ blobs and fidelity.
+    show_plot : bool
+        If True, add a legend and display the figure.
 
     Returns
     -------
@@ -520,16 +531,18 @@ def analyze_qubit_spectroscopy(global_data_path, filename,
     print("  Fit results:")
     pp.pprint(fit_results)
 
-    plt.legend()
+    if show_plot:
+        plt.legend()
     _stamp_data_path(data)
-    plt.show()
+    if show_plot:
+        plt.show()
 
     return fig
 
 
 def analyze_length_rabi(global_data_path, filename,
                          SS=False, ef=False,
-                         plot_cal=False):
+                         plot_cal=False, show_plot=True):
     """
     Length (time) Rabi oscillation experiment.
 
@@ -545,6 +558,8 @@ def analyze_length_rabi(global_data_path, filename,
         True if this is an e-f Rabi experiment.
     plot_cal : bool
         If True (and SS=True), plot the g/e calibration IQ blobs and fidelity.
+    show_plot : bool
+        If True, add a legend and display the figure.
 
     Returns
     -------
@@ -606,9 +621,11 @@ def analyze_length_rabi(global_data_path, filename,
     plt.plot(x, y, label='fit')
     plt.axvline(peak, linestyle='--', c='red',
                 label=f'pi pulse: {peak:.3f} us')
-    plt.legend()
+    if show_plot:
+        plt.legend()
     _stamp_data_path(data)
-    plt.show()
+    if show_plot:
+        plt.show()
 
     return fig
 
@@ -616,7 +633,7 @@ def analyze_length_rabi(global_data_path, filename,
 def analyze_amplitude_rabi(global_data_path, filename,
                             SS=False, ef=False,
                             gain_cutoff_low=0.0, gain_cutoff_high=1.0,
-                            plot_cal=False):
+                            plot_cal=False, show_plot=True):
     """
     Amplitude (power) Rabi oscillation experiment.
 
@@ -636,6 +653,8 @@ def analyze_amplitude_rabi(global_data_path, filename,
         Upper bound of gain range to include in the fit.
     plot_cal : bool
         If True (and SS=True), plot the g/e calibration IQ blobs and fidelity.
+    show_plot : bool
+        If True, add a legend and display the figure.
 
     Returns
     -------
@@ -696,16 +715,18 @@ def analyze_amplitude_rabi(global_data_path, filename,
     plt.axvline(half_pi, c='red', linestyle='--',
                 label=f'pi/2 pulse: {half_pi:.3f} DAC')
     plt.title(f"Amplitude Rabi Oscillations (Sigma = {config['sigma_ge']:.2f})")
-    plt.legend()
+    if show_plot:
+        plt.legend()
     _stamp_data_path(data)
-    plt.show()
+    if show_plot:
+        plt.show()
 
     return fig
 
 
 def analyze_t2_ramsey(global_data_path, filename,
                        SS=False, ef=False,
-                       plot_cal=False):
+                       plot_cal=False, show_plot=True):
     """
     T2 Ramsey fringe experiment.
 
@@ -723,6 +744,8 @@ def analyze_t2_ramsey(global_data_path, filename,
         True if this is an e-f Ramsey experiment.
     plot_cal : bool
         If True (and SS=True), plot the g/e calibration IQ blobs and fidelity.
+    show_plot : bool
+        If True, add a legend and display the figure.
 
     Returns
     -------
@@ -786,9 +809,11 @@ def analyze_t2_ramsey(global_data_path, filename,
     plt.plot(x_ns, exp_upper, label='fit upper bound')
     plt.axhline(offset, color='black', linestyle='--',
                 label=f"offset: {offset:.3f}")
-    plt.legend()
+    if show_plot:
+        plt.legend()
     _stamp_data_path(data)
-    plt.show()
+    if show_plot:
+        plt.show()
 
     # Corrected qubit frequency
     new_freq_ge = (config['qubit_freq_ge']
@@ -799,7 +824,7 @@ def analyze_t2_ramsey(global_data_path, filename,
 
 
 def analyze_t2_spin_echo(global_data_path, filename,
-                          SS=False, plot_cal=False):
+                          SS=False, plot_cal=False, show_plot=True):
     """
     T2 spin-echo experiment.
 
@@ -813,6 +838,8 @@ def analyze_t2_spin_echo(global_data_path, filename,
         True if single-shot normalisation data was collected.
     plot_cal : bool
         If True (and SS=True), plot the g/e calibration IQ blobs and fidelity.
+    show_plot : bool
+        If True, add a legend and display the figure.
 
     Returns
     -------
@@ -853,20 +880,22 @@ def analyze_t2_spin_echo(global_data_path, filename,
         plt.ylabel("a.u.")
     plt.xlabel(r"Delay Time ($\mu$s)")
     plt.title("Spin Echo Experiment")
-    plt.legend()
+    if show_plot:
+        plt.legend()
 
     fit = Fit()
     fit_results = fit.ramsey(delay_times, ydata, plot=True)
     print("  Spin echo fit results:")
     pp.pprint(fit_results)
     _stamp_data_path(data)
-    plt.show()
+    if show_plot:
+        plt.show()
 
     return fig
 
 
 def analyze_t1(global_data_path, filename,
-               SS=False, plot_cal=False):
+               SS=False, plot_cal=False, show_plot=True):
     """
     T1 relaxation experiment.
 
@@ -880,6 +909,8 @@ def analyze_t1(global_data_path, filename,
         True if single-shot normalisation data was collected.
     plot_cal : bool
         If True (and SS=True), plot the g/e calibration IQ blobs and fidelity.
+    show_plot : bool
+        If True, add a legend and display the figure.
 
     Returns
     -------
@@ -922,14 +953,16 @@ def analyze_t1(global_data_path, filename,
     plt.xlabel("Delay Time (ns)")
     plt.title(f"T1 Experiment: Gain = {config['qubit_gain_ge']}, "
               f"Sigma (us) = {config['sigma_ge']}")
-    plt.legend()
+    if show_plot:
+        plt.legend()
 
     fit = Fit()
     fit_results = fit.T1(x_ns, ydata, plot=True)
     print("  T1 fit results:")
     pp.pprint(fit_results)
     _stamp_data_path(data)
-    plt.show()
+    if show_plot:
+        plt.show()
 
     return fig
 
@@ -938,7 +971,7 @@ def analyze_single_shot(global_data_path, filename,
                          ef=False,
                          fidelity_method="method1",
                          hist_range=50,
-                         bin_num=100):
+                         bin_num=100, show_plot=True):
     """
     Single-shot IQ readout experiment.
 
@@ -961,6 +994,8 @@ def analyze_single_shot(global_data_path, filename,
         Range parameter for method2 (passed to ``hist()``).
     bin_num : int
         Number of histogram bins for method1.
+    show_plot : bool
+        If True, add a legend and display the IQ scatter figure.
 
     Returns
     -------
@@ -989,10 +1024,12 @@ def analyze_single_shot(global_data_path, filename,
         plt.plot(I_f, Q_f, '.', label='f')
     plt.xlabel("I")
     plt.ylabel("Q")
-    plt.legend()
+    if show_plot:
+        plt.legend()
     plt.axis('square')
     _stamp_data_path(data)
-    plt.show()
+    if show_plot:
+        plt.show()
 
     # g-e fidelity
     print("--- g-e fidelity ---")
@@ -1018,7 +1055,7 @@ def analyze_single_shot(global_data_path, filename,
 def analyze_readout_optimization(global_data_path, filename,
                                   ge=True, gf=False, ef=False,
                                   fidelity_method="method1",
-                                  hist_range=50):
+                                  hist_range=50, show_plot=True):
     """
     Readout optimisation sweep (frequency x gain).
 
@@ -1044,6 +1081,8 @@ def analyze_readout_optimization(global_data_path, filename,
         Note: method1 is significantly faster for the full sweep.
     hist_range : float
         Range parameter for method2.
+    show_plot : bool
+        If True, display the fidelity colormap figure.
 
     Returns
     -------
@@ -1167,7 +1206,8 @@ def analyze_readout_optimization(global_data_path, filename,
         plt.title("Fidelity, Discriminate e-f")
     plt.colorbar(figA)
     _stamp_data_path(data)
-    plt.show()
+    if show_plot:
+        plt.show()
 
     # Print optimal point
     idx_amp_max, idx_freq_max = np.where(fid_Array == np.max(fid_Array))
@@ -1182,7 +1222,8 @@ def inspect_readout_optimization_point(global_data_path, filename,
                                         gain_index, freq_index,
                                         ge=True, gf=False, ef=False,
                                         fidelity_method="method1",
-                                        hist_range=50, bin_num=100):
+                                        hist_range=50, bin_num=100,
+                                        show_plot=True):
     """
     Inspect a specific (gain, freq) point from the readout optimisation sweep.
 
@@ -1206,6 +1247,8 @@ def inspect_readout_optimization_point(global_data_path, filename,
         Range parameter for method2.
     bin_num : int
         Number of histogram bins for method1.
+    show_plot : bool
+        If True, add a legend and display the IQ scatter figure.
 
     Returns
     -------
@@ -1244,10 +1287,12 @@ def inspect_readout_optimization_point(global_data_path, filename,
     plt.plot(I_e, Q_e, '.', label='e', zorder=2)
     plt.xlabel("I")
     plt.ylabel("Q")
-    plt.legend()
+    if show_plot:
+        plt.legend()
     plt.axis('square')
     _stamp_data_path(data)
-    plt.show()
+    if show_plot:
+        plt.show()
 
     print(f"  Gain:      {gain_val} (index {gain_index})")
     print(f"  Frequency: {freq_val} MHz (index {freq_index})")

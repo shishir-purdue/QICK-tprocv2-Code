@@ -305,6 +305,11 @@ def analyze_time_of_flight(global_data_path, filename):
         Root directory for all data files.
     filename : str
         HDF5 filename, e.g. "00000_tof_Q1_2026-06-06.h5".
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        Handle to the plotted figure, for further modification.
     """
     data = _build_path(global_data_path, filename)
     print(f"Data path: {data}")
@@ -315,7 +320,7 @@ def analyze_time_of_flight(global_data_path, filename):
         Q = array(f['avgq'])[0]
         config = _load_config(f)
 
-    plt.figure()
+    fig = plt.figure()
     plt.plot(t, I, label="I value")
     plt.plot(t, Q, label="Q value")
     plt.plot(t, np.abs(I + 1j * Q), label="magnitude")
@@ -325,6 +330,8 @@ def analyze_time_of_flight(global_data_path, filename):
     plt.title("Time of Flight Experiment")
     _stamp_data_path(data)
     plt.show()
+
+    return fig
 
 
 def analyze_resonator_spectroscopy(global_data_path, filename,
@@ -353,6 +360,11 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
     logscale : bool
         If True, plot the amplitude data and fit in dB (log) scale instead
         of linear a.u.
+
+    Returns
+    -------
+    fig_amp, fig_phase : matplotlib Figure
+        Handles to the amplitude and phase figures, for further modification.
     """
     data = _build_path(global_data_path, filename)
     print(f"Data path: {data}")
@@ -368,7 +380,7 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
     amps_db = 20 * np.log10(amps)
 
     # --- Amplitude plot ---
-    plt.figure(figsize=(12, 6))
+    fig_amp = plt.figure(figsize=(12, 6))
     plt.plot(freqs, amps_db if logscale else amps, marker='o', label='data')
     plt.ylabel("dB" if logscale else "a.u.")
     plt.xlabel("Resonator Frequency (MHz)")
@@ -428,13 +440,15 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
     plt.show()
 
     # --- Phase plot ---
-    plt.figure(figsize=(12, 6))
+    fig_phase = plt.figure(figsize=(12, 6))
     plt.plot(freqs, np.unwrap(phases), marker='o', label='phase data')
     plt.ylabel("radians")
     plt.xlabel("Resonator Frequency (MHz)")
     plt.title("Resonator Spectroscopy Phase")
     _stamp_data_path(data)
     plt.show()
+
+    return fig_amp, fig_phase
 
 
 def analyze_qubit_spectroscopy(global_data_path, filename,
@@ -457,6 +471,11 @@ def analyze_qubit_spectroscopy(global_data_path, filename,
         DAC current in mA (for plot labelling).
     plot_cal : bool
         If True (and SS=True), plot the g/e calibration IQ blobs and fidelity.
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        Handle to the plotted figure, for further modification.
     """
     data = _build_path(global_data_path, filename)
     print(f"Data path: {data}")
@@ -484,7 +503,7 @@ def analyze_qubit_spectroscopy(global_data_path, filename,
     else:
         ydata = amps
 
-    plt.figure(figsize=(12, 6))
+    fig = plt.figure(figsize=(12, 6))
     plt.plot(freqs, ydata, marker='o', label='data')
     if SS:
         plt.ylabel("Qubit Population")
@@ -505,6 +524,8 @@ def analyze_qubit_spectroscopy(global_data_path, filename,
     _stamp_data_path(data)
     plt.show()
 
+    return fig
+
 
 def analyze_length_rabi(global_data_path, filename,
                          SS=False, ef=False,
@@ -524,6 +545,11 @@ def analyze_length_rabi(global_data_path, filename,
         True if this is an e-f Rabi experiment.
     plot_cal : bool
         If True (and SS=True), plot the g/e calibration IQ blobs and fidelity.
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        Handle to the plotted figure, for further modification.
     """
     data = _build_path(global_data_path, filename)
     print(f"Data path: {data}")
@@ -551,7 +577,7 @@ def analyze_length_rabi(global_data_path, filename,
     else:
         ydata = amps
 
-    plt.figure(figsize=(12, 6))
+    fig = plt.figure(figsize=(12, 6))
     plt.plot(lengths, ydata, marker='o', label='data')
     if SS:
         plt.ylabel("Qubit Population")
@@ -584,6 +610,8 @@ def analyze_length_rabi(global_data_path, filename,
     _stamp_data_path(data)
     plt.show()
 
+    return fig
+
 
 def analyze_amplitude_rabi(global_data_path, filename,
                             SS=False, ef=False,
@@ -608,6 +636,11 @@ def analyze_amplitude_rabi(global_data_path, filename,
         Upper bound of gain range to include in the fit.
     plot_cal : bool
         If True (and SS=True), plot the g/e calibration IQ blobs and fidelity.
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        Handle to the plotted figure, for further modification.
     """
     data = _build_path(global_data_path, filename)
     print(f"Data path: {data}")
@@ -635,7 +668,7 @@ def analyze_amplitude_rabi(global_data_path, filename,
     else:
         ydata = amps
 
-    plt.figure(figsize=(12, 6))
+    fig = plt.figure(figsize=(12, 6))
     if SS:
         plt.ylabel("Qubit Population")
         plt.axhline(1, color='black', linestyle='--')
@@ -667,6 +700,8 @@ def analyze_amplitude_rabi(global_data_path, filename,
     _stamp_data_path(data)
     plt.show()
 
+    return fig
+
 
 def analyze_t2_ramsey(global_data_path, filename,
                        SS=False, ef=False,
@@ -688,6 +723,11 @@ def analyze_t2_ramsey(global_data_path, filename,
         True if this is an e-f Ramsey experiment.
     plot_cal : bool
         If True (and SS=True), plot the g/e calibration IQ blobs and fidelity.
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        Handle to the plotted figure, for further modification.
     """
     data = _build_path(global_data_path, filename)
     print(f"Data path: {data}")
@@ -718,7 +758,7 @@ def analyze_t2_ramsey(global_data_path, filename,
 
     x_ns = delay_times * 1000  # convert us -> ns
 
-    plt.figure(figsize=(12, 6))
+    fig = plt.figure(figsize=(12, 6))
     plt.plot(x_ns, ydata, marker='o', label='data')
     if SS:
         plt.ylabel("Qubit Population")
@@ -755,6 +795,8 @@ def analyze_t2_ramsey(global_data_path, filename,
                    - (fit_results['f'][0] * 1e3 - config['ramsey_freq']))
     print(f"  New Qubit frequency: {new_freq_ge:.6f} MHz")
 
+    return fig
+
 
 def analyze_t2_spin_echo(global_data_path, filename,
                           SS=False, plot_cal=False):
@@ -771,6 +813,11 @@ def analyze_t2_spin_echo(global_data_path, filename,
         True if single-shot normalisation data was collected.
     plot_cal : bool
         If True (and SS=True), plot the g/e calibration IQ blobs and fidelity.
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        Handle to the plotted figure, for further modification.
     """
     data = _build_path(global_data_path, filename)
     print(f"Data path: {data}")
@@ -798,7 +845,7 @@ def analyze_t2_spin_echo(global_data_path, filename,
 
     delay_times = delay_times1 + delay_times2
 
-    plt.figure(figsize=(12, 6))
+    fig = plt.figure(figsize=(12, 6))
     plt.plot(delay_times, ydata, marker='o', label='data')
     if SS:
         plt.ylabel("Qubit Population")
@@ -814,6 +861,8 @@ def analyze_t2_spin_echo(global_data_path, filename,
     pp.pprint(fit_results)
     _stamp_data_path(data)
     plt.show()
+
+    return fig
 
 
 def analyze_t1(global_data_path, filename,
@@ -831,6 +880,11 @@ def analyze_t1(global_data_path, filename,
         True if single-shot normalisation data was collected.
     plot_cal : bool
         If True (and SS=True), plot the g/e calibration IQ blobs and fidelity.
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        Handle to the plotted figure, for further modification.
     """
     data = _build_path(global_data_path, filename)
     print(f"Data path: {data}")
@@ -857,7 +911,7 @@ def analyze_t1(global_data_path, filename,
 
     x_ns = delay_times * 1000  # us -> ns
 
-    plt.figure(figsize=(12, 6))
+    fig = plt.figure(figsize=(12, 6))
     plt.plot(x_ns, ydata, marker='o', label='data')
     if SS:
         plt.ylabel("Qubit Population")
@@ -876,6 +930,8 @@ def analyze_t1(global_data_path, filename,
     pp.pprint(fit_results)
     _stamp_data_path(data)
     plt.show()
+
+    return fig
 
 
 def analyze_single_shot(global_data_path, filename,
@@ -905,6 +961,11 @@ def analyze_single_shot(global_data_path, filename,
         Range parameter for method2 (passed to ``hist()``).
     bin_num : int
         Number of histogram bins for method1.
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        Handle to the IQ scatter figure, for further modification.
     """
     data = _build_path(global_data_path, filename)
     print(f"Data path: {data}")
@@ -920,7 +981,7 @@ def analyze_single_shot(global_data_path, filename,
         config = _load_config(f)
 
     # IQ scatter plot
-    plt.figure()
+    fig = plt.figure()
     plt.title("IQ Plot")
     plt.plot(I_g, Q_g, '.', label='g')
     plt.plot(I_e, Q_e, '.', label='e')
@@ -950,6 +1011,8 @@ def analyze_single_shot(global_data_path, filename,
         print("--- e-f fidelity ---")
         _compute_fidelity_ef_projection(I_e, Q_e, I_f, Q_f,
                                          bin_num=bin_num, plot=True)
+
+    return fig
 
 
 def analyze_readout_optimization(global_data_path, filename,
@@ -990,6 +1053,8 @@ def analyze_readout_optimization(global_data_path, filename,
         Gain values corresponding to rows.
     freqs_list : 1D np.array
         Frequency values corresponding to columns.
+    fig : matplotlib Figure
+        Handle to the fidelity colormap figure, for further modification.
     """
     data = _build_path(global_data_path, filename)
     print(f"Data path: {data}")
@@ -1087,7 +1152,7 @@ def analyze_readout_optimization(global_data_path, filename,
                 fid_Array[idx_g, idx_f] = max(fid_curve) * 2 - 1
 
     # 2D fidelity colormap
-    plt.figure(figsize=(24, 8), dpi=80)
+    fig = plt.figure(figsize=(24, 8), dpi=80)
     norm_color = matplotlib.colors.Normalize(vmin=0.0, vmax=1.0)
     figA = plt.pcolormesh(freqs_list, gains_list, fid_Array, norm=norm_color)
     figB = plt.contour(freqs_list, gains_list, fid_Array, 10, colors='w')
@@ -1110,7 +1175,7 @@ def analyze_readout_optimization(global_data_path, filename,
     print(f"  Optimal gain:  {gains_list[idx_amp_max[0]]:.4f}  (index {idx_amp_max[0]})")
     print(f"  Optimal freq:  {freqs_list[idx_freq_max[0]]:.4f} MHz  (index {idx_freq_max[0]})")
 
-    return fid_Array, gains_list, freqs_list
+    return fid_Array, gains_list, freqs_list, fig
 
 
 def inspect_readout_optimization_point(global_data_path, filename,
@@ -1141,6 +1206,11 @@ def inspect_readout_optimization_point(global_data_path, filename,
         Range parameter for method2.
     bin_num : int
         Number of histogram bins for method1.
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        Handle to the IQ scatter figure, for further modification.
     """
     data = _build_path(global_data_path, filename)
 
@@ -1168,7 +1238,7 @@ def inspect_readout_optimization_point(global_data_path, filename,
     Q_e = Q_e_array[freq_index][0][gain_index][0]
 
     # IQ scatter
-    plt.figure()
+    fig = plt.figure()
     plt.title(f"IQ Plot\nGain = {gain_val}, Frequency = {freq_val} MHz")
     plt.plot(I_g, Q_g, '.', label='g', zorder=1)
     plt.plot(I_e, Q_e, '.', label='e', zorder=2)
@@ -1199,3 +1269,5 @@ def inspect_readout_optimization_point(global_data_path, filename,
         Q_f = Q_f_array[freq_index][0][gain_index][0]
         _compute_fidelity_ef_projection(I_e, Q_e, I_f, Q_f,
                                          bin_num=bin_num, plot=True)
+
+    return fig

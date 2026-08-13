@@ -24,6 +24,11 @@ Usage
         global_data_path=r"C:/Users/G41Lab/Dropbox/_Data/...",
         filename=r"00000_res_spec_ge_Q1_2026-06-06.h5",
     )
+
+    # Example: convert a DAC gain to dBm/mW from a single calibration point
+    dac_to_power(dac=0.5, dac_ref=0.2, dbm_ref=-10.0)               # -> dBm
+    dac_to_power(dac=0.5, dac_ref=0.2, dbm_ref=-10.0, units='mW')   # -> mW
+    power_to_dac(power=-6.0, dac_ref=0.2, dbm_ref=-10.0)            # -> DAC gain
 """
 
 import matplotlib
@@ -40,6 +45,75 @@ from circle_fit_dcm import notch_circlefit, model_S21
 
 # Default color cycle for multi-trace plots
 COLORS = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'orange']
+
+
+# =============================================================================
+#  Unit conversion utilities
+# =============================================================================
+
+def dac_to_power(dac, dac_ref, dbm_ref, units='dBm'):
+    """
+    Convert a DAC gain value to output RF power, calibrated from a single
+    reference point.
+
+    Assumes DAC gain (in [0, 1]) scales linearly with the pulse's output
+    voltage amplitude (true for QICK gen-channel gain), so power follows
+    dBm = dbm_ref + 20*log10(dac/dac_ref).
+
+    Parameters
+    ----------
+    dac : float or array
+        DAC gain value(s) to convert, in [0, 1].
+    dac_ref : float
+        Reference DAC gain used for calibration, in [0, 1].
+    dbm_ref : float
+        Measured/known power in dBm at dac_ref.
+    units : str
+        'dBm' (default) or 'mW' for the returned power units.
+
+    Returns
+    -------
+    power : float or array
+        Power in the requested units.
+    """
+    dbm = dbm_ref + 20 * np.log10(dac / dac_ref)
+    if units == 'dBm':
+        return dbm
+    elif units == 'mW':
+        return 10 ** (dbm / 10)
+    else:
+        raise ValueError(f"Unknown units: {units!r} (use 'dBm' or 'mW')")
+
+
+def power_to_dac(power, dac_ref, dbm_ref, units='dBm'):
+    """
+    Convert a target RF power to the DAC gain value that should produce it,
+    calibrated from a single reference point (inverse of ``dac_to_power``).
+
+    Parameters
+    ----------
+    power : float or array
+        Target power, in the units given by ``units``.
+    dac_ref : float
+        Reference DAC gain used for calibration, in [0, 1].
+    dbm_ref : float
+        Measured/known power in dBm at dac_ref.
+    units : str
+        Units of ``power``: 'dBm' (default) or 'mW'.
+
+    Returns
+    -------
+    dac : float or array
+        DAC gain value(s) implied by ``power``. Not clipped to [0, 1] --
+        check the result is in range before using it as a gain setting.
+    """
+    if units == 'dBm':
+        dbm = power
+    elif units == 'mW':
+        dbm = 10 * np.log10(power)
+    else:
+        raise ValueError(f"Unknown units: {units!r} (use 'dBm' or 'mW')")
+    return dac_ref * 10 ** ((dbm - dbm_ref) / 20)
 
 
 # =============================================================================
@@ -634,7 +708,7 @@ def analyze_amplitude_rabi(global_data_path, filename,
                             SS=False, ef=False,
                             gain_cutoff_low=0.0, gain_cutoff_high=1.0,
                             plot_cal=False, show_plot=True,
-                            full_pi_offset=0.0, half_pi_offset=0.0):
+                            full_pi_offset=0.0, half_pi_offset=0.0, title_append=""):
     """
     Amplitude (power) Rabi oscillation experiment.
 
@@ -718,10 +792,10 @@ def analyze_amplitude_rabi(global_data_path, filename,
     print(f"  Phase offset (deg from fit): "
           f"{(fit_results[2] * 180 / np.pi) / (2 * np.pi * fit_results[1]):.4f}")
 
-    # plt.axvline(peak, c='red', label=f'pi pulse: {peak:.3f} DAC')
-    # plt.axvline(half_pi, c='red', linestyle='--',
-    #             label=f'pi/2 pulse: {half_pi:.3f} DAC')
-    plt.title(f"Amplitude Rabi Oscillations (Sigma = {config['sigma_ge']:.2f})")
+    plt.axvline(peak, c='red', label=f'pi pulse: {peak:.3f} DAC')
+    plt.axvline(half_pi, c='red', linestyle='--',
+                label=f'pi/2 pulse: {half_pi:.3f} DAC')
+    plt.title(f"Amplitude Rabi Oscillations (Sigma = {config['sigma_ge']:.2f})\n" + title_append)
     if show_plot:
         plt.legend()
     _stamp_data_path(data)

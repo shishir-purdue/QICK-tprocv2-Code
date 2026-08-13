@@ -411,12 +411,12 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
                         label=f"min amp: {freqs[np.argmin(amps)]:.3f}")
             print(f"  Min amp at {freqs[np.argmin(amps)]} MHz")
             print("  Circle fit (DCM) results:")
-            print(f"    f0 = {fit['fr']:.4f} MHz")
-            print(f"    Ql = {fit['Ql']:.1f}")
-            print(f"    Qc = {fit['Qc']:.1f}")
-            print(f"    Qi = {fit['Qi']:.1f}")
-            print(f"    phi0 = {fit['phi0']:.4f} rad")
-            print(f"    delay = {fit['delay']:.4f} us")
+            print(f"    f0 = {fit['fr']} MHz")
+            print(f"    Ql = {fit['Ql']}")
+            print(f"    Qc = {fit['Qc']}")
+            print(f"    Qi = {fit['Qi']}")
+            print(f"    phi0 = {fit['phi0']} rad")
+            print(f"    delay = {fit['delay']} us")
 
         elif fit_method == 'hanger':
             # hangerfunc_new_withQc fits in dB, so fit on the log-scale data
@@ -432,10 +432,10 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
                         label=f"min amp: {freqs[np.argmin(amps)]:.3f}")
             print(f"  Min amp at {freqs[np.argmin(amps)]} MHz")
             print("  Hanger fit results:")
-            print(f"    f0 = {f0:.4f} MHz")
-            print(f"    Qi = {Qi:.1f}")
-            print(f"    Qc = {Qc:.1f}")
-            print(f"    df = {df:.4f} MHz")
+            print(f"    f0 = {f0} MHz")
+            print(f"    Qi = {Qi}")
+            print(f"    Qc = {Qc}")
+            print(f"    df = {df} MHz")
             print(f"    scale = {scale:.4f}")
 
         else:
@@ -526,7 +526,7 @@ def analyze_qubit_spectroscopy(global_data_path, filename,
               f"Sigma (us) = {config['sigma_ge']}, DAC (mA) = {dac}")
 
     fit = Fit()
-    fit_results = fit.transmission_resonator_spectroscopy(freqs, ydata, plot=True)
+    fit_results = fit.transmission_resonator_spectroscopy(freqs, ydata, plot=show_plot)
     plt.axvline(fit_results['f'][0], c='red', linestyle='--')
     print("  Fit results:")
     pp.pprint(fit_results)
@@ -604,7 +604,7 @@ def analyze_length_rabi(global_data_path, filename,
     plt.title(f"Length Rabi Oscillations (Qubit gain = {config['qubit_gain_ge']:.2f})")
 
     # Fit with decaying sinusoid
-    fit_results = fitdecaysin(lengths, ydata, showfit=False)
+    fit_results = fitdecaysin(lengths, ydata, showfit=show_plot)
     print("  fitdecaysin results:")
     pp.pprint(fit_results)
 
@@ -633,7 +633,8 @@ def analyze_length_rabi(global_data_path, filename,
 def analyze_amplitude_rabi(global_data_path, filename,
                             SS=False, ef=False,
                             gain_cutoff_low=0.0, gain_cutoff_high=1.0,
-                            plot_cal=False, show_plot=True):
+                            plot_cal=False, show_plot=True,
+                            full_pi_offset=0.0, half_pi_offset=0.0):
     """
     Amplitude (power) Rabi oscillation experiment.
 
@@ -655,6 +656,10 @@ def analyze_amplitude_rabi(global_data_path, filename,
         If True (and SS=True), plot the g/e calibration IQ blobs and fidelity.
     show_plot : bool
         If True, add a legend and display the figure.
+    full_pi_offset : float
+        Added to the fitted pi-pulse gain (peak).
+    half_pi_offset : float
+        Added to the fitted pi/2-pulse gain (half_pi).
 
     Returns
     -------
@@ -705,15 +710,17 @@ def analyze_amplitude_rabi(global_data_path, filename,
 
     peak = 0.5 / fit_results[1]
     half_pi = peak / 2.0
+    peak += full_pi_offset
+    half_pi += half_pi_offset
     print(f"  Pi-pulse gain:    {peak:.4f} DAC units")
     print(f"  Pi/2-pulse gain:  {half_pi:.4f} DAC units")
     print(f"  Max population:   {ydata[np.argmax(ydata)]:.4f}")
     print(f"  Phase offset (deg from fit): "
           f"{(fit_results[2] * 180 / np.pi) / (2 * np.pi * fit_results[1]):.4f}")
 
-    plt.axvline(peak, c='red', label=f'pi pulse: {peak:.3f} DAC')
-    plt.axvline(half_pi, c='red', linestyle='--',
-                label=f'pi/2 pulse: {half_pi:.3f} DAC')
+    # plt.axvline(peak, c='red', label=f'pi pulse: {peak:.3f} DAC')
+    # plt.axvline(half_pi, c='red', linestyle='--',
+    #             label=f'pi/2 pulse: {half_pi:.3f} DAC')
     plt.title(f"Amplitude Rabi Oscillations (Sigma = {config['sigma_ge']:.2f})")
     if show_plot:
         plt.legend()
@@ -724,7 +731,7 @@ def analyze_amplitude_rabi(global_data_path, filename,
     return fig
 
 
-def analyze_t2_ramsey(global_data_path, filename,
+def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,
                        SS=False, ef=False,
                        plot_cal=False, show_plot=True):
     """
@@ -795,13 +802,13 @@ def analyze_t2_ramsey(global_data_path, filename,
               f", $\\pi / 2$ Gain = {config['half_pi_gain']}")
 
     fit = Fit()
-    fit_results = fit.ramsey(x_ns, ydata, plot=True)
+    fit_results = fit.ramsey(x_ns, ydata, plot=show_plot)
     print("  Ramsey fit results:")
     pp.pprint(fit_results)
 
     # Decay envelope
     T2 = fit_results['T2'][0]
-    offset = fit_results['final_offset'][0]
+    offset = fit_results['final_offset'][0] + my_offset
     amp = fit_results['amp'][0]
     exp_lower = (amp / 2) * (-np.exp(-x_ns / T2)) + offset
     exp_upper = (amp / 2) * np.exp(-x_ns / T2) + offset
@@ -884,7 +891,7 @@ def analyze_t2_spin_echo(global_data_path, filename,
         plt.legend()
 
     fit = Fit()
-    fit_results = fit.ramsey(delay_times, ydata, plot=True)
+    fit_results = fit.ramsey(delay_times, ydata, plot=show_plot)
     print("  Spin echo fit results:")
     pp.pprint(fit_results)
     _stamp_data_path(data)
@@ -957,7 +964,7 @@ def analyze_t1(global_data_path, filename,
         plt.legend()
 
     fit = Fit()
-    fit_results = fit.T1(x_ns, ydata, plot=True)
+    fit_results = fit.T1(x_ns, ydata, plot=show_plot)
     print("  T1 fit results:")
     pp.pprint(fit_results)
     _stamp_data_path(data)

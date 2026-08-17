@@ -35,6 +35,12 @@ Usage
         global_data_path=r"C:/Users/G41Lab/Dropbox/_Data/...",
         folder_name="2026-08-17overnight _T1_ge",
     )
+
+    # Example: analyze an overnight folder of qubit spectroscopy runs vs. time
+    analyze_qubit_spec_temporal_scan(
+        global_data_path=r"C:/Users/G41Lab/Dropbox/_Data/...",
+        folder_name="2026-08-17overnight _qubit_spec_ge",
+    )
 """
 
 import matplotlib
@@ -620,6 +626,80 @@ def analyze_qubit_spectroscopy(global_data_path, filename,
         plt.show()
 
     return fig
+
+
+def analyze_qubit_spec_temporal_scan(global_data_path, folder_name,
+                                      time_spacing_min=5.0, show_plot=True):
+    """
+    Qubit spectroscopy temporal scan (e.g. a folder of overnight qubit
+    spectroscopy runs).
+
+    Loads every qubit spectroscopy data file in a folder, fits the qubit
+    frequency for each one, and plots the fitted frequencies against
+    elapsed time. Measurements are assumed to be evenly spaced
+    ``time_spacing_min`` minutes apart (matching e.g. the night_wait
+    interval used by 003a_overnight_qubit_spec_ge.py), in the order the
+    files sort alphabetically (i.e. by their sequential file number).
+
+    Parameters
+    ----------
+    global_data_path : str
+        Root directory for all data files.
+    folder_name : str
+        Name of the subfolder (under global_data_path) containing the
+        qubit spectroscopy data files, e.g.
+        "2026-08-17overnight _qubit_spec_ge".
+    time_spacing_min : float
+        Assumed time in minutes between consecutive measurements.
+    show_plot : bool
+        If True, add a legend and display the figure.
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        Handle to the plotted figure, for further modification.
+    freq_values : 1D np.array
+        Fitted qubit frequency (MHz) for each file, in the order plotted.
+    """
+    folder_path = os.path.join(global_data_path, folder_name)
+    print(f"Data folder: {folder_path}")
+
+    files = sorted(f for f in os.listdir(folder_path) if f.endswith('.h5'))
+    if not files:
+        raise ValueError(f"No .h5 files found in {folder_path}")
+
+    freq_values = []
+    for fname in files:
+        with SlabFile(os.path.join(folder_path, fname), 'r') as f:
+            freqs = array(f['fpts'])[0]
+            amps = array(f['amps'])[0]
+
+        fit = Fit()
+        fit_results = fit.transmission_resonator_spectroscopy(freqs, amps, plot=False)
+        freq_values.append(fit_results['f'][0])
+
+    freq_values = np.array(freq_values)
+    time_axis = np.arange(len(files)) * time_spacing_min
+
+    # earliest file's timestamp, for the start-time stamp
+    mtimes = [os.path.getmtime(os.path.join(folder_path, fname)) for fname in files]
+    start_time = datetime.datetime.fromtimestamp(min(mtimes))
+
+    fig = plt.figure(figsize=(12, 6))
+    plt.plot(time_axis, freq_values, marker='o', linestyle='-', label='qubit freq')
+    plt.xlabel("Elapsed Time (min)")
+    plt.ylabel("Qubit Frequency (MHz)")
+    plt.title(f"Qubit Spectroscopy Temporal Scan ({len(files)} measurements, "
+              f"{time_spacing_min:.1f} min spacing)")
+    if show_plot:
+        plt.legend()
+    _stamp_data_path(
+        f"{folder_path}\nStart time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}",
+        fig)
+    if show_plot:
+        plt.show()
+
+    return fig, freq_values
 
 
 def analyze_length_rabi(global_data_path, filename,

@@ -29,6 +29,12 @@ Usage
     dac_to_power(dac=0.5, dac_ref=0.2, dbm_ref=-10.0)               # -> dBm
     dac_to_power(dac=0.5, dac_ref=0.2, dbm_ref=-10.0, units='mW')   # -> mW
     power_to_dac(power=-6.0, dac_ref=0.2, dbm_ref=-10.0)            # -> DAC gain
+
+    # Example: analyze an overnight folder of T1 runs vs. time
+    analyze_T1_temporal_scan(
+        global_data_path=r"C:/Users/G41Lab/Dropbox/_Data/...",
+        folder_name="2026-08-17overnight _T1_ge",
+    )
 """
 
 import matplotlib
@@ -36,6 +42,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import json
 import pprint as pp
+import os
+import datetime
 
 from fitting import *
 from qualang_tools.plot import Fit
@@ -1046,6 +1054,79 @@ def analyze_t1(global_data_path, filename,
         plt.show()
 
     return fig
+
+
+def analyze_T1_temporal_scan(global_data_path, folder_name,
+                              time_spacing_min=5.0, show_plot=True):
+    """
+    T1 temporal scan (e.g. a folder of overnight T1 runs).
+
+    Loads every T1 data file in a folder, fits T1 for each one, and plots
+    the fitted T1 values against elapsed time. Measurements are assumed to
+    be evenly spaced ``time_spacing_min`` minutes apart (matching e.g. the
+    night_wait interval used by 008a_overnight_T1_ge.py), in the order the
+    files sort alphabetically (i.e. by their sequential file number).
+
+    Parameters
+    ----------
+    global_data_path : str
+        Root directory for all data files.
+    folder_name : str
+        Name of the subfolder (under global_data_path) containing the T1
+        data files, e.g. "2026-08-17overnight _T1_ge".
+    time_spacing_min : float
+        Assumed time in minutes between consecutive measurements.
+    show_plot : bool
+        If True, add a legend and display the figure.
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        Handle to the plotted figure, for further modification.
+    T1_values : 1D np.array
+        Fitted T1 (us) for each file, in the order plotted.
+    """
+    folder_path = os.path.join(global_data_path, folder_name)
+    print(f"Data folder: {folder_path}")
+
+    files = sorted(f for f in os.listdir(folder_path) if f.endswith('.h5'))
+    if not files:
+        raise ValueError(f"No .h5 files found in {folder_path}")
+
+    T1_values = []
+    for fname in files:
+        with SlabFile(os.path.join(folder_path, fname), 'r') as f:
+            delay_times = array(f['delay_times'])[0]
+            amps = array(f['amps'])[0]
+
+        x_ns = delay_times * 1000  # us -> ns
+
+        fit = Fit()
+        fit_results = fit.T1(x_ns, amps, plot=False)
+        T1_values.append(fit_results['T1'][0])
+
+    T1_values = np.array(T1_values)
+    time_axis = np.arange(len(files)) * time_spacing_min
+
+    # earliest file's timestamp, for the start-time stamp
+    mtimes = [os.path.getmtime(os.path.join(folder_path, fname)) for fname in files]
+    start_time = datetime.datetime.fromtimestamp(min(mtimes))
+
+    fig = plt.figure(figsize=(12, 6))
+    plt.plot(time_axis, T1_values, marker='o', linestyle='-', label='T1')
+    plt.xlabel("Elapsed Time (min)")
+    plt.ylabel(r"T1 ($\mu s$)")
+    plt.title(f"T1 Temporal Scan ({len(files)} measurements, "
+              f"{time_spacing_min:.1f} min spacing)")
+    if show_plot:
+        plt.legend()
+    _stamp_data_path(
+        f"{folder_path}\nStart time: {start_time.strftime('%Y-%m-%d %H:%M:%S')}",
+        fig)
+    if show_plot:
+        plt.show()
+
+    return fig, T1_values
 
 
 def analyze_single_shot(global_data_path, filename,

@@ -325,7 +325,9 @@
             4250
          ],
          "steps": 300,
-         "relax_delay": 100
+         "relax_delay": 100,
+         "night_wait" : 5,
+         "night_num" : 10
       },
       "time_rabi_ge": {
          "reps": 500,

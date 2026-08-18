@@ -632,14 +632,17 @@ def analyze_qubit_spec_temporal_scan(global_data_path, folder_name,
                                       time_spacing_min=5.0, show_plot=True):
     """
     Qubit spectroscopy temporal scan (e.g. a folder of overnight qubit
-    spectroscopy runs).
+    spectroscopy runs), plotted as a frequency-vs-time colormap.
 
-    Loads every qubit spectroscopy data file in a folder, fits the qubit
-    frequency for each one, and plots the fitted frequencies against
-    elapsed time. Measurements are assumed to be evenly spaced
-    ``time_spacing_min`` minutes apart (matching e.g. the night_wait
-    interval used by 003a_overnight_qubit_spec_ge.py), in the order the
-    files sort alphabetically (i.e. by their sequential file number).
+    Loads every qubit spectroscopy data file in a folder and plots a 2D
+    colormap: x = elapsed time, y = frequency, z = spectroscopy
+    amplitude (magnitude). The peak frequency of each individual spectrum
+    (the frequency of its maximum amplitude) is overlaid as a line, and
+    the qubit frequency is also fit for each file. Measurements are
+    assumed to be evenly spaced ``time_spacing_min`` minutes apart
+    (matching e.g. the night_wait interval used by
+    003a_overnight_qubit_spec_ge.py), in the order the files sort
+    alphabetically (i.e. by their sequential file number).
 
     Parameters
     ----------
@@ -660,6 +663,9 @@ def analyze_qubit_spec_temporal_scan(global_data_path, folder_name,
         Handle to the plotted figure, for further modification.
     freq_values : 1D np.array
         Fitted qubit frequency (MHz) for each file, in the order plotted.
+    peaks : 1D np.array
+        Frequency (MHz) of the maximum amplitude point of each individual
+        spectrum -- this is the line overlaid on the colormap.
     """
     folder_path = os.path.join(global_data_path, folder_name)
     print(f"Data folder: {folder_path}")
@@ -669,24 +675,41 @@ def analyze_qubit_spec_temporal_scan(global_data_path, folder_name,
         raise ValueError(f"No .h5 files found in {folder_path}")
 
     freq_values = []
+    peaks = []
+    amps_list = []
+    freqs_ref = None
     for fname in files:
         with SlabFile(os.path.join(folder_path, fname), 'r') as f:
             freqs = array(f['fpts'])[0]
             amps = array(f['amps'])[0]
 
+        if freqs_ref is None:
+            freqs_ref = freqs
+        elif len(freqs) != len(freqs_ref):
+            raise ValueError(
+                f"{fname} has a different number of frequency points "
+                f"({len(freqs)}) than earlier files ({len(freqs_ref)}); "
+                "can't build a shared colormap frequency axis.")
+        amps_list.append(amps)
+
         fit = Fit()
         fit_results = fit.transmission_resonator_spectroscopy(freqs, amps, plot=False)
         freq_values.append(fit_results['f'][0])
+        peaks.append(freqs[np.argmax(amps)])
 
     freq_values = np.array(freq_values)
+    peaks = np.array(peaks)
     time_axis = np.arange(len(files)) * time_spacing_min
+    z_data = np.array(amps_list).T  # shape (n_freqs, n_files)
 
     # earliest file's timestamp, for the start-time stamp
     mtimes = [os.path.getmtime(os.path.join(folder_path, fname)) for fname in files]
     start_time = datetime.datetime.fromtimestamp(min(mtimes))
 
     fig = plt.figure(figsize=(12, 6))
-    plt.plot(time_axis, freq_values, marker='o', linestyle='-', label='qubit freq')
+    mesh = plt.pcolormesh(time_axis, freqs_ref, z_data, shading='auto')
+    plt.colorbar(mesh, label='Amplitude (a.u.)')
+    plt.plot(time_axis, peaks, marker='o', linestyle='-', c='red', label='peak')
     plt.xlabel("Elapsed Time (min)")
     plt.ylabel("Qubit Frequency (MHz)")
     plt.title(f"Qubit Spectroscopy Temporal Scan ({len(files)} measurements, "
@@ -699,7 +722,7 @@ def analyze_qubit_spec_temporal_scan(global_data_path, folder_name,
     if show_plot:
         plt.show()
 
-    return fig, freq_values
+    return fig, freq_values, peaks
 
 
 def analyze_length_rabi(global_data_path, filename,
@@ -1137,6 +1160,7 @@ def analyze_t1(global_data_path, filename,
 
 
 def analyze_T1_temporal_scan(global_data_path, folder_name,
+                              error_bars=True,
                               time_spacing_min=5.0, show_plot=True):
     """
     T1 temporal scan (e.g. a folder of overnight T1 runs).
@@ -1154,6 +1178,9 @@ def analyze_T1_temporal_scan(global_data_path, folder_name,
     folder_name : str
         Name of the subfolder (under global_data_path) containing the T1
         data files, e.g. "2026-08-17overnight _T1_ge".
+    error_bars : bool
+        If True (default), draw whisker-style error bars (in black) on
+        each point using the standard error the T1 fit itself reports.
     time_spacing_min : float
         Assumed time in minutes between consecutive measurements.
     show_plot : bool
@@ -1165,6 +1192,8 @@ def analyze_T1_temporal_scan(global_data_path, folder_name,
         Handle to the plotted figure, for further modification.
     T1_values : 1D np.array
         Fitted T1 (us) for each file, in the order plotted.
+    T1_errors : 1D np.array
+        Fit standard error on T1 (us) for each file, in the order plotted.
     """
     folder_path = os.path.join(global_data_path, folder_name)
     print(f"Data folder: {folder_path}")
@@ -1174,6 +1203,7 @@ def analyze_T1_temporal_scan(global_data_path, folder_name,
         raise ValueError(f"No .h5 files found in {folder_path}")
 
     T1_values = []
+    T1_errors = []
     for fname in files:
         with SlabFile(os.path.join(folder_path, fname), 'r') as f:
             delay_times = array(f['delay_times'])[0]
@@ -1184,8 +1214,10 @@ def analyze_T1_temporal_scan(global_data_path, folder_name,
         fit = Fit()
         fit_results = fit.T1(x_ns, amps, plot=False)
         T1_values.append(fit_results['T1'][0])
+        T1_errors.append(fit_results['T1'][1])
 
     T1_values = np.array(T1_values)
+    T1_errors = np.array(T1_errors)
     time_axis = np.arange(len(files)) * time_spacing_min
 
     # earliest file's timestamp, for the start-time stamp
@@ -1193,7 +1225,12 @@ def analyze_T1_temporal_scan(global_data_path, folder_name,
     start_time = datetime.datetime.fromtimestamp(min(mtimes))
 
     fig = plt.figure(figsize=(12, 6))
-    plt.plot(time_axis, T1_values, marker='o', linestyle='-', label='T1')
+    if error_bars:
+        plt.errorbar(time_axis, T1_values, yerr=T1_errors,
+                     marker='o', linestyle='-', label='T1',
+                     ecolor='black', elinewidth=1, capsize=4, capthick=1)
+    else:
+        plt.plot(time_axis, T1_values, marker='o', linestyle='-', label='T1')
     plt.xlabel("Elapsed Time (min)")
     plt.ylabel(r"T1 ($\mu s$)")
     plt.title(f"T1 Temporal Scan ({len(files)} measurements, "
@@ -1206,7 +1243,7 @@ def analyze_T1_temporal_scan(global_data_path, folder_name,
     if show_plot:
         plt.show()
 
-    return fig, T1_values
+    return fig, T1_values, T1_errors
 
 
 def analyze_single_shot(global_data_path, filename,

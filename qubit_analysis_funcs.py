@@ -190,7 +190,8 @@ def _compute_fidelity_by_projection(I_g, Q_g, I_e, Q_e,
                                      bin_num=100,
                                      n_threshold_pts=1000,
                                      plot=True,
-                                     title_prefix=""):
+                                     title_prefix="",
+                                     data_path=None):
     """
     Fidelity estimate — Method 1 (manual IQ projection + threshold sweep).
 
@@ -205,6 +206,8 @@ def _compute_fidelity_by_projection(I_g, Q_g, I_e, Q_e,
     n_threshold_pts : int  Number of threshold points to sweep.
     plot : bool         Show the projected histogram.
     title_prefix : str  Optional prefix for the plot title.
+    data_path : str or None  If given (and plot), stamp it at the bottom
+        of the figure.
 
     Returns
     -------
@@ -236,6 +239,8 @@ def _compute_fidelity_by_projection(I_g, Q_g, I_e, Q_e,
 
     if plot:
         plt.title(f"{title_prefix}Readout Fidelity: {best_fid:.3f}")
+        if data_path is not None:
+            _stamp_data_path(data_path)
         plt.show()
 
     print(f"  Method 1 fidelity = {best_fid:.4f}")
@@ -246,7 +251,7 @@ def _compute_fidelity_by_projection(I_g, Q_g, I_e, Q_e,
 
 
 def _compute_fidelity_by_hist(I_g, Q_g, I_e, Q_e,
-                               plot=True, ran=50):
+                               plot=True, ran=50, data_path=None):
     """
     Fidelity estimate — Method 2 (using the ``hist`` helper from
     plotting_helpers, which performs an optimal-angle rotation).
@@ -257,6 +262,8 @@ def _compute_fidelity_by_hist(I_g, Q_g, I_e, Q_e,
     I_e, Q_e : array   Single-shot I/Q for |e>.
     plot : bool         Show the rotated histogram.
     ran : float         Histogram range parameter passed to ``hist()``.
+    data_path : str or None  If given (and plot), stamp it at the bottom
+        of the figure.
 
     Returns
     -------
@@ -267,6 +274,8 @@ def _compute_fidelity_by_hist(I_g, Q_g, I_e, Q_e,
     fid, threshold, angle = hist(
         data=[I_g, Q_g, I_e, Q_e], plot=plot, ran=ran
     )
+    if plot and data_path is not None:
+        _stamp_data_path(data_path)
     print(f"  Method 2 fidelity = {fid:.3f}")
     print(f"  threshold = {threshold:.4f},  angle = {angle:.4f}")
     return fid, threshold, angle
@@ -275,7 +284,8 @@ def _compute_fidelity_by_hist(I_g, Q_g, I_e, Q_e,
 def _compute_fidelity_gf_projection(I_g, Q_g, I_f, Q_f,
                                      bin_num=100,
                                      n_threshold_pts=1000,
-                                     plot=True):
+                                     plot=True,
+                                     data_path=None):
     """
     Fidelity by projection for g-f discrimination.
 
@@ -294,6 +304,8 @@ def _compute_fidelity_gf_projection(I_g, Q_g, I_f, Q_f,
         plt.hist(fstate, bins=bin_num, label='f', alpha=0.7, color='g')
         plt.legend()
         plt.title("Readout g-f")
+        if data_path is not None:
+            _stamp_data_path(data_path)
         plt.show()
 
     th_list = np.linspace(min(gstate), max(fstate), n_threshold_pts)
@@ -312,7 +324,8 @@ def _compute_fidelity_gf_projection(I_g, Q_g, I_f, Q_f,
 def _compute_fidelity_ef_projection(I_e, Q_e, I_f, Q_f,
                                      bin_num=100,
                                      n_threshold_pts=1000,
-                                     plot=True):
+                                     plot=True,
+                                     data_path=None):
     """
     Fidelity by projection for e-f discrimination.
 
@@ -331,6 +344,8 @@ def _compute_fidelity_ef_projection(I_e, Q_e, I_f, Q_f,
         plt.hist(fstate, bins=bin_num, label='f', alpha=0.7)
         plt.legend()
         plt.title("Readout e-f")
+        if data_path is not None:
+            _stamp_data_path(data_path)
         plt.show()
 
     th_list = np.linspace(min(estate), max(fstate), n_threshold_pts)
@@ -897,16 +912,16 @@ def analyze_amplitude_rabi(global_data_path, filename,
     half_pi = peak / 2.0
     peak += full_pi_offset
     half_pi += half_pi_offset
-    print(f"  Pi-pulse gain:    {peak:.4f} DAC units")
-    print(f"  Pi/2-pulse gain:  {half_pi:.4f} DAC units")
-    print(f"  Max population:   {ydata[np.argmax(ydata)]:.4f}")
+    print(f"  Pi-pulse gain:    {peak:.5f} DAC units")
+    print(f"  Pi/2-pulse gain:  {half_pi:.5f} DAC units")
+    print(f"  Max population:   {ydata[np.argmax(ydata)]:.5f}")
     print(f"  Phase offset (deg from fit): "
-          f"{(fit_results[2] * 180 / np.pi) / (2 * np.pi * fit_results[1]):.4f}")
+          f"{(fit_results[2] * 180 / np.pi) / (2 * np.pi * fit_results[1]):.5f}")
 
     plt.axvline(peak, c='red', label=f'pi pulse: {peak:.3f} DAC')
     plt.axvline(half_pi, c='red', linestyle='--',
                 label=f'pi/2 pulse: {half_pi:.3f} DAC')
-    plt.title(f"Amplitude Rabi Oscillations (Sigma = {config['sigma_ge']:.2f})\n" + title_append)
+    plt.title(f"Amplitude Rabi Oscillations (Sigma = {config['sigma_ge']:.5f})\n" + title_append)
     if show_plot:
         plt.legend()
     _stamp_data_path(data)
@@ -1226,11 +1241,11 @@ def analyze_T1_temporal_scan(global_data_path, folder_name,
 
     fig = plt.figure(figsize=(12, 6))
     if error_bars:
-        plt.errorbar(time_axis, T1_values, yerr=T1_errors,
+        plt.errorbar(time_axis, T1_values/1e3, yerr=T1_errors/1e3,
                      marker='o', linestyle='-', label='T1',
                      ecolor='black', elinewidth=1, capsize=4, capthick=1)
     else:
-        plt.plot(time_axis, T1_values, marker='o', linestyle='-', label='T1')
+        plt.plot(time_axis, T1_values/1e3, marker='o', linestyle='-', label='T1')
     plt.xlabel("Elapsed Time (min)")
     plt.ylabel(r"T1 ($\mu s$)")
     plt.title(f"T1 Temporal Scan ({len(files)} measurements, "
@@ -1314,19 +1329,23 @@ def analyze_single_shot(global_data_path, filename,
     print("--- g-e fidelity ---")
     if fidelity_method in ("method1", "both"):
         _compute_fidelity_by_projection(I_g, Q_g, I_e, Q_e,
-                                         bin_num=bin_num, plot=True)
+                                         bin_num=bin_num, plot=True,
+                                         data_path=data)
     if fidelity_method in ("method2", "both"):
         _compute_fidelity_by_hist(I_g, Q_g, I_e, Q_e,
-                                   plot=True, ran=hist_range)
+                                   plot=True, ran=hist_range,
+                                   data_path=data)
 
     # g-f and e-f fidelity if ef data present
     if ef:
         print("--- g-f fidelity ---")
         _compute_fidelity_gf_projection(I_g, Q_g, I_f, Q_f,
-                                         bin_num=bin_num, plot=True)
+                                         bin_num=bin_num, plot=True,
+                                         data_path=data)
         print("--- e-f fidelity ---")
         _compute_fidelity_ef_projection(I_e, Q_e, I_f, Q_f,
-                                         bin_num=bin_num, plot=True)
+                                         bin_num=bin_num, plot=True,
+                                         data_path=data)
 
     return fig
 
@@ -1579,19 +1598,23 @@ def inspect_readout_optimization_point(global_data_path, filename,
     if ge:
         if fidelity_method in ("method1", "both"):
             _compute_fidelity_by_projection(I_g, Q_g, I_e, Q_e,
-                                             bin_num=bin_num, plot=True)
+                                             bin_num=bin_num, plot=True,
+                                             data_path=data)
         if fidelity_method in ("method2", "both"):
             _compute_fidelity_by_hist(I_g, Q_g, I_e, Q_e,
-                                       plot=True, ran=hist_range)
+                                       plot=True, ran=hist_range,
+                                       data_path=data)
     elif gf:
         I_f = I_f_array[freq_index][0][gain_index][0]
         Q_f = Q_f_array[freq_index][0][gain_index][0]
         _compute_fidelity_gf_projection(I_g, Q_g, I_f, Q_f,
-                                         bin_num=bin_num, plot=True)
+                                         bin_num=bin_num, plot=True,
+                                         data_path=data)
     elif ef:
         I_f = I_f_array[freq_index][0][gain_index][0]
         Q_f = Q_f_array[freq_index][0][gain_index][0]
         _compute_fidelity_ef_projection(I_e, Q_e, I_f, Q_f,
-                                         bin_num=bin_num, plot=True)
+                                         bin_num=bin_num, plot=True,
+                                         data_path=data)
 
     return fig

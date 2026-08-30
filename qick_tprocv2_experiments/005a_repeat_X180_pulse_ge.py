@@ -1,8 +1,11 @@
 """
-005_power_rabi_ge - Power Rabi Experiment for ge state
+005a_repeat_X180_pulse_ge - Repeated X180 Pi-Pulse Calibration for ge state
 
-This experiment is used to perform power rabi experiment using a Gaussian pulse
-for a single qubit. The gain sweep is done using a QickParam object.
+This experiment sweeps the pi-pulse gain while playing the pi pulse 2N+1 times
+before each readout, so that a small amplitude error accumulates into a
+2N+1 times larger rotation error and becomes easy to see. N is read from the
+system_config.json block for this experiment; the gain sweep is done using a
+QickParam object.
 
 We also have the option to perform single shot measurements for g-e calibration
 after the experiment. This is done by setting the SS variable to True in the 

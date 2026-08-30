@@ -58,7 +58,7 @@ class SingleToneSpectroscopyProgram(AveragerProgramV2):
         if MUX == 'False': # non-MUX case
             ro_ch = cfg['ro_ch']
             res_ch = cfg['res_ch']
-            qubit_ch_ef = cfg['qubit_ch_ef']
+            qubit_ch_ge = cfg['qubit_ch']
 
             # declare the proper readout channels using
             declare_gen_ch(self, cfg, res_ch, usage = 'res', suffix = '_ef')
@@ -76,13 +76,13 @@ class SingleToneSpectroscopyProgram(AveragerProgramV2):
             initialize_ro_chs(self, cfg, suffix='_ef')
 
         # initialize the qubit generator channel
-        declare_gen_ch(self, cfg, qubit_ch_ef, usage='qubit', suffix='_ge')
+        declare_gen_ch(self, cfg, qubit_ch_ge, usage='qubit', suffix='_ge')
         # initialize qubit pulse
-        declare_pulse(self, cfg, qubit_ch_ef, usage='qubit', 
-                    pulse_style='gauss', pulse_name='qubit_pi_pulse', suffix='_ef')
+        declare_pulse(self, cfg, qubit_ch_ge, usage='qubit', 
+                    pulse_style='gauss', pulse_name='qubit_pi_pulse', suffix='_ge')
         
     def _body(self, cfg):
-        self.pulse(ch=cfg['qubit_ch_ef'], name="qubit_pi_pulse", t=0)
+        self.pulse(ch=cfg['qubit_ch'], name="qubit_pi_pulse", t=0) # should be ge?
         self.delay_auto(0.01)
         # readout using proper configurations for MUX and non-MUX
         readout(self, cfg)
@@ -127,11 +127,12 @@ if IS_VISDOM:
                  opts=dict(height=400, width=700, title='Resonator Spectroscopy', showlegend=True, xlabel='expt_pts'))
 
     amps = np.abs(expt_I + 1j*expt_Q)
-    
+    phases = np.angle(expt_I + 1j*expt_Q)
 else:
     iq_list = prog.acquire(soc, soft_avgs = py_avg, progress=True)
     freqs = prog.get_pulse_param("res_pulse", "freq", as_array=True)
     amps = np.abs(iq_list[0][0].dot([1,1j]))
+    phases = np.angle(iq_list[0][0].dot([1,1j]))
 
 
 # print("Fitting data...")
@@ -170,6 +171,7 @@ with SlabFile(data_path + '\\' + fname, 'a') as f:
     # - Adds data to the file - #
     f.append('fpts', freqs)
     f.append('amps', amps)
+    f.append('phases', phases)
     if IS_VISDOM:
         f.append('avgi', expt_I)
         f.append('avgq', expt_Q)

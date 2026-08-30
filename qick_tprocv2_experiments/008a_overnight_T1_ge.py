@@ -76,7 +76,7 @@ night_num = config['night_num']    # number of overnight runs
 # ----- Overnight data subfolder ----- #
 # Created if it doesn't exist yet; reused (new files just get the next
 # sequential name) if it does.
-overnight_folder_name = str(datetime.date.today()) + "overnight _T1_ge"
+overnight_folder_name = str(datetime.date.today()) + "_overnight _T1_ge"
 overnight_data_path = os.path.join(DATA_PATH, overnight_folder_name)
 os.makedirs(overnight_data_path, exist_ok=True)
 print('Overnight data folder: ' + overnight_data_path)

@@ -932,33 +932,23 @@ def analyze_amplitude_rabi(global_data_path, filename,
 
 
 def analyze_repeat_X90_pulse(global_data_path, filename,
-                              SS=False, ef=False,
-                              gain_cutoff_low=0.0, gain_cutoff_high=1.0,
-                              target='auto', n_pulses=None,
-                              fit_window=3, show_fit=True,
-                              plot_cal=False, show_plot=True,
-                              gain_offset=0.0, title_append=""):
+                               SS=False, ef=False,
+                               gain_cutoff_low=0.0, gain_cutoff_high=1.0,
+                               extremum='auto', fit_window=3,
+                               plot_cal=False, show_plot=True,
+                               gain_offset=0.0, title_append=""):
     """
-    Repeated-X90 (error amplification) pulse calibration.
+    Repeated-X90 (error amplification) pi-pulse calibration.
 
-    The experiment repeats the X90 pulse before each readout while sweeping
-    its gain, so a fractional amplitude error eps shows up multiplied by the
-    number of pulses instead of on its own.
+    The experiment plays the pi pulse 2N+1 times before each readout while
+    sweeping its gain, so a fractional amplitude error eps shows up as a
+    rotation error of (2N+1)*eps instead of eps. The calibration point is the
+    gain where the signal turns over: there every pulse is a true pi rotation,
+    so the odd number of them always lands the qubit in the same state.
 
-    Where the calibrated gain sits depends on where the sequence leaves the
-    qubit:
-
-    - An even number of X90 pulses lands on a pole, so the signal reaches an
-      extremum at the correct gain - a maximum if the sequence amounts to an
-      odd number of pi rotations, a minimum if it amounts to an even number.
-      The turning point is located with a local quadratic fit.
-    - An odd number of X90 pulses lands on the equator, so the population sits
-      at 0.5 at the correct gain and walks away from it linearly as the pulse
-      is mis-set. There is no extremum to find; the calibration point is the
-      0.5 crossing, located with a local linear fit. That only means anything
-      on a normalised population axis, so it needs SS=True.
-
-    'target' picks between those; 'auto' reads it off the data.
+    Because the sweep is normally only a handful of points across a single
+    lobe, the turning point is located with a local quadratic fit rather than
+    a full sine fit, which needs several periods to be stable.
 
     Parameters
     ----------
@@ -967,35 +957,28 @@ def analyze_repeat_X90_pulse(global_data_path, filename,
     filename : str
         HDF5 filename, e.g. "00000_repeat_X90_pulse_ge_Q1_2026-08-30.h5".
     SS : bool
-        True if single-shot normalisation data was collected. Required for
-        target='half'.
+        True if single-shot normalisation data was collected.
     ef : bool
         True if this is an e-f experiment.
     gain_cutoff_low : float
         Lower bound of the gain range to include.
     gain_cutoff_high : float
         Upper bound of the gain range to include.
-    target : {'auto', 'max', 'min', 'half'}
-        Where a correctly calibrated pulse lands. 'auto' picks 'max' or 'min'
-        when the population rails near 1 or 0, 'half' when it only wobbles
-        around the equator, and falls back to whichever extremum sits further
-        from the sweep edges when SS=False.
-    n_pulses : int or None
-        Number of X90 pulses per point. Used for the title and the reported
-        amplification factor only - it does not affect the fit. Defaults to
-        2*N+1 from the saved config, matching the loop in
-        005a_repeat_X90_pulse_ge.py; pass it explicitly if that loop changes.
+    extremum : {'auto', 'max', 'min'}
+        Whether the calibration point is a maximum or a minimum of the signal.
+        'auto' picks whichever candidate sits further from the sweep edges,
+        since an extremum on an edge usually means the sweep ran out of range
+        rather than a real turning point. With SS=True the pi gain is always
+        the population maximum, so 'auto' resolves to 'max'.
     fit_window : int
-        Number of points either side of the calibration point used for the
-        local fit.
-    show_fit : bool
-        If True, draw the fitted curve and the calibrated-gain marker.
+        Number of points either side of the extremum used for the quadratic
+        fit.
     plot_cal : bool
         If True (and SS=True), plot the g/e calibration IQ blobs and fidelity.
     show_plot : bool
         If True, add a legend and display the figure.
     gain_offset : float
-        Added to the fitted gain.
+        Added to the fitted pi-pulse gain.
     title_append : str
         Extra text appended to the plot title.
 
@@ -1008,15 +991,6 @@ def analyze_repeat_X90_pulse(global_data_path, filename,
     print(f"Data path: {data}")
 
     with SlabFile(data, 'r') as f:
-        if SS:
-            needed = ['I_g', 'Q_g', 'I_e', 'Q_e'] + (['I_f', 'Q_f'] if ef else [])
-            missing = [k for k in needed if k not in list(f.keys())]
-            if missing:
-                raise KeyError(
-                    f"{filename} has no {', '.join(missing)} - it was taken "
-                    "with SS = 'False' in system_config.json. Re-run the "
-                    "experiment with SS = 'True', or analyse with SS=False.")
-
         gains = np.atleast_1d(array(f['gains'])[0])
         I = np.atleast_1d(array(f['avgi'])[0])
         Q = np.atleast_1d(array(f['avgq'])[0])
@@ -1040,8 +1014,7 @@ def analyze_repeat_X90_pulse(global_data_path, filename,
             "qubit_gain_ge into a QickSweep1D for this experiment.")
 
     N = config.get('N', None)
-    if n_pulses is None and N is not None:
-        n_pulses = 2 * N + 1
+    n_pulses = 2 * N + 1 if N is not None else None
 
     if SS:
         if plot_cal:
@@ -1056,116 +1029,67 @@ def analyze_repeat_X90_pulse(global_data_path, filename,
     x = gains[cutoff]
     y = ydata[cutoff]
 
-    def _dist_from_edge(i):
-        return min(i, len(y) - 1 - i)
-
-    if target == 'auto' and n_pulses is not None:
-        # At the correct gain the sequence has rotated n_pulses * pi/2, so the
-        # pulse count alone fixes where it lands: a multiple of 4 comes back to
-        # |g>, 2 mod 4 lands on |e>, and an odd count stops on the equator.
-        target = {0: 'min', 2: 'max'}.get(n_pulses % 4, 'half')
-        print(f"  Target from n_pulses = {n_pulses}: {target}")
-        if target == 'half' and not SS:
-            print("  Note: an odd pulse count lands on the equator, which "
-                  "cannot be located without a normalised population axis. "
-                  "Re-run the analysis with SS=True; falling back to the "
-                  "nearest extremum for now.")
-            target = 'auto'
-
-    if target == 'auto':
-        # No usable pulse count - read the target off the data instead. Keep
-        # whichever extremum sits further from the sweep edges, since one on an
-        # edge is usually the sweep running out of range rather than a real
-        # turning point. 'half' is not identifiable this way.
-        target = ('max' if _dist_from_edge(int(np.argmax(y)))
-                           >= _dist_from_edge(int(np.argmin(y))) else 'min')
-        print(f"  Target (auto-detected from data): {target}")
-
-    if target == 'half' and not SS:
-        raise ValueError(
-            "target='half' needs a normalised population axis to locate the "
-            "0.5 crossing - re-analyse with SS=True.")
-
-    coeffs = None
-    if target == 'half':
-        # Calibration point is where the population crosses 0.5.
-        sign_change = np.where(np.diff(np.sign(y - 0.5)) != 0)[0]
-        if sign_change.size == 0:
-            raise ValueError(
-                "the population never crosses 0.5 inside the gain window - "
-                "re-centre start/stop on the X90 gain and re-run.")
-        # Prefer the crossing nearest the middle of the sweep.
-        i_c = int(sign_change[np.argmin(np.abs(sign_change - (len(y) - 1) / 2.0))])
-        lo = max(i_c - fit_window + 1, 0)
-        hi = min(i_c + fit_window + 1, len(x))
-        if hi - lo >= 2:
-            coeffs = np.polyfit(x[lo:hi], y[lo:hi], 1)
-        if coeffs is not None and coeffs[0] != 0:
-            best_gain = (0.5 - coeffs[1]) / coeffs[0]
-            if not (x[lo] <= best_gain <= x[hi - 1]):
-                print("  Warning: the linear fit put the crossing outside the "
-                      "fit window; interpolating between neighbours instead.")
-                coeffs = None
-        if coeffs is None:
-            # Straight interpolation between the two bracketing points.
-            x0, x1, y0, y1 = x[i_c], x[i_c + 1], y[i_c], y[i_c + 1]
-            best_gain = x0 + (0.5 - y0) * (x1 - x0) / (y1 - y0)
-        i_mark = i_c
-    else:
-        use_max = (target == 'max')
-        i_ext = int(np.argmax(y)) if use_max else int(np.argmin(y))
-        lo = max(i_ext - fit_window, 0)
-        hi = min(i_ext + fit_window + 1, len(x))
-        if hi - lo >= 3:
-            coeffs = np.polyfit(x[lo:hi], y[lo:hi], 2)
-            best_gain = -coeffs[1] / (2 * coeffs[0]) if coeffs[0] != 0 else x[i_ext]
-            # A vertex outside the fitted points means the parabola is
-            # extrapolating, so fall back to the measured extremum.
-            if not (x[lo] <= best_gain <= x[hi - 1]):
-                print("  Warning: quadratic vertex fell outside the fit "
-                      "window; using the raw extremum instead.")
-                best_gain, coeffs = x[i_ext], None
+    # Which way does the turning point point?
+    if extremum == 'auto':
+        if SS:
+            use_max = True
         else:
-            print("  Warning: fewer than 3 points available; "
-                  "using the raw extremum instead of a fit.")
-            best_gain = x[i_ext]
-        i_mark = i_ext
+            i_hi, i_lo = int(np.argmax(y)), int(np.argmin(y))
+            dist_from_edge = lambda i: min(i, len(y) - 1 - i)
+            use_max = dist_from_edge(i_hi) >= dist_from_edge(i_lo)
+    else:
+        use_max = (extremum == 'max')
+    i_ext = int(np.argmax(y)) if use_max else int(np.argmin(y))
+
+    # Local quadratic fit around the turning point
+    lo = max(i_ext - fit_window, 0)
+    hi = min(i_ext + fit_window + 1, len(x))
+    coeffs = None
+    if hi - lo >= 3:
+        coeffs = np.polyfit(x[lo:hi], y[lo:hi], 2)
+        best_gain = -coeffs[1] / (2 * coeffs[0]) if coeffs[0] != 0 else x[i_ext]
+        # A vertex outside the fitted points means the parabola is
+        # extrapolating, so fall back to the measured extremum.
+        if not (x[lo] <= best_gain <= x[hi - 1]):
+            print("  Warning: quadratic vertex fell outside the fit window; "
+                  "using the raw extremum instead.")
+            best_gain, coeffs = x[i_ext], None
+    else:
+        print("  Warning: fewer than 3 points available; "
+              "using the raw extremum instead of a fit.")
+        best_gain = x[i_ext]
 
     best_gain += gain_offset
 
-    if i_mark in (0, len(x) - 1):
-        print("  Warning: the calibration point is at the edge of the sweep - "
-              "re-centre start/stop on the X90 gain and re-run.")
+    if i_ext in (0, len(x) - 1):
+        print("  Warning: the turning point is at the edge of the sweep - "
+              "re-centre start/stop on the pi gain and re-run.")
 
     fig = plt.figure(figsize=(12, 6))
     if SS:
         plt.ylabel("Qubit Population")
         plt.axhline(1, color='black', linestyle='--')
         plt.axhline(0, color='black', linestyle='--')
-        if target == 'half':
-            plt.axhline(0.5, color='gray', linestyle='--')
     else:
         plt.ylabel("a.u.")
     plt.xlabel("Pulse Gain (DAC units)")
 
     plt.plot(x, y, 'o-', color='tab:blue', markersize=5, label='data')
-    if show_fit:
-        if coeffs is not None:
-            x_fine = np.linspace(x[lo], x[hi - 1], 200)
-            plt.plot(x_fine, np.polyval(coeffs, x_fine), 'r-', linewidth=1.5,
-                     label='fit')
-        plt.axvline(best_gain, c='red', linestyle='--',
-                    label=f'X90 gain: {best_gain:.5f} DAC')
+    if coeffs is not None:
+        x_fine = np.linspace(x[lo], x[hi - 1], 200)
+        plt.plot(x_fine, np.polyval(coeffs, x_fine), 'r-', linewidth=1.5,
+                 label='quadratic fit')
+    plt.axvline(best_gain, c='red', linestyle='--',
+                label=f'pi pulse: {best_gain:.5f} DAC')
 
     pulse_str = (f"{n_pulses} pulses per point (N = {N})"
                  if n_pulses is not None else "repeated pulses")
-    plt.title(f"Repeated X90 Pulse Calibration - {pulse_str}\n" + title_append)
+    plt.title(f"Repeated X90 Pi-Pulse Calibration - {pulse_str}\n" + title_append)
 
     step = np.mean(np.diff(x)) if len(x) > 1 else float('nan')
-    print(f"  Pulses per point:    {n_pulses}")
-    print(f"  Calibration point:   {target}")
-    print(f"  Calibrated X90 gain: {best_gain:.6f} DAC units")
-    print(f"  Sweep window:        {x[0]:.6f} to {x[-1]:.6f} DAC units "
+    print(f"  Pulses per point:   {n_pulses}")
+    print(f"  Calibrated pi gain: {best_gain:.6f} DAC units")
+    print(f"  Sweep window:       {x[0]:.6f} to {x[-1]:.6f} DAC units "
           f"({len(x)} pts, step {step:.6f})")
     if n_pulses is not None:
         print(f"  Error amplification: {n_pulses}x vs. a single-pulse Rabi")
@@ -1177,6 +1101,85 @@ def analyze_repeat_X90_pulse(global_data_path, filename,
         plt.show()
 
     return fig
+
+
+# =============================================================================
+#  Parked: X90 calibration-point selection (target / 'half' crossing)
+#
+#  Not used by analyze_repeat_X90_pulse above, which just finds the turning
+#  point of the signal. Kept here because it may matter later: with n_pulses
+#  X90 pulses the sequence has rotated n_pulses * pi/2 at the correct gain, so
+#  where it lands depends on the pulse count - a multiple of 4 returns to |g>
+#  (a minimum), 2 mod 4 lands on |e> (a maximum), and an odd count stops on the
+#  equator, where the population sits at 0.5 and there is no extremum to find.
+#
+#  To bring it back: add target='auto' and n_pulses=None to the signature and
+#  drop these two blocks in where the comments say.
+# =============================================================================
+#
+# --- goes where the extremum direction is chosen ---
+#
+# if target == 'auto' and n_pulses is not None:
+#     target = {0: 'min', 2: 'max'}.get(n_pulses % 4, 'half')
+#     print(f"  Target from n_pulses = {n_pulses}: {target}")
+#     if target == 'half' and not SS:
+#         print("  Note: an odd pulse count lands on the equator, which "
+#               "cannot be located without a normalised population axis. "
+#               "Re-run the analysis with SS=True; falling back to the "
+#               "nearest extremum for now.")
+#         target = 'auto'
+#
+# if target == 'auto':
+#     # No usable pulse count - read the target off the data instead. Keep
+#     # whichever extremum sits further from the sweep edges, since one on an
+#     # edge is usually the sweep running out of range rather than a real
+#     # turning point. 'half' is not identifiable this way.
+#     target = ('max' if _dist_from_edge(int(np.argmax(y)))
+#                        >= _dist_from_edge(int(np.argmin(y))) else 'min')
+#     print(f"  Target (auto-detected from data): {target}")
+#
+# if target == 'half' and not SS:
+#     raise ValueError(
+#         "target='half' needs a normalised population axis to locate the "
+#         "0.5 crossing - re-analyse with SS=True.")
+#
+# --- replaces the quadratic fit when target == 'half' ---
+#
+# # Calibration point is where the population crosses 0.5.
+# sign_change = np.where(np.diff(np.sign(y - 0.5)) != 0)[0]
+# if sign_change.size == 0:
+#     raise ValueError(
+#         "the population never crosses 0.5 inside the gain window - "
+#         "re-centre start/stop on the X90 gain and re-run.")
+# # Prefer the crossing nearest the middle of the sweep.
+# i_c = int(sign_change[np.argmin(np.abs(sign_change - (len(y) - 1) / 2.0))])
+# lo = max(i_c - fit_window + 1, 0)
+# hi = min(i_c + fit_window + 1, len(x))
+# if hi - lo >= 2:
+#     coeffs = np.polyfit(x[lo:hi], y[lo:hi], 1)
+# if coeffs is not None and coeffs[0] != 0:
+#     best_gain = (0.5 - coeffs[1]) / coeffs[0]
+#     if not (x[lo] <= best_gain <= x[hi - 1]):
+#         print("  Warning: the linear fit put the crossing outside the "
+#               "fit window; interpolating between neighbours instead.")
+#         coeffs = None
+# if coeffs is None:
+#     # Straight interpolation between the two bracketing points.
+#     x0, x1, y0, y1 = x[i_c], x[i_c + 1], y[i_c], y[i_c + 1]
+#     best_gain = x0 + (0.5 - y0) * (x1 - x0) / (y1 - y0)
+# i_mark = i_c
+#
+# --- and the readable guard for SS=True on a file with no single-shot data ---
+#
+# if SS:
+#     needed = ['I_g', 'Q_g', 'I_e', 'Q_e'] + (['I_f', 'Q_f'] if ef else [])
+#     missing = [k for k in needed if k not in list(f.keys())]
+#     if missing:
+#         raise KeyError(
+#             f"{filename} has no {', '.join(missing)} - it was taken "
+#             "with SS = 'False' in system_config.json. Re-run the "
+#             "experiment with SS = 'True', or analyse with SS=False.")
+# =============================================================================
 
 
 def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,

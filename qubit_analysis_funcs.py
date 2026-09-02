@@ -932,32 +932,32 @@ def analyze_amplitude_rabi(global_data_path, filename,
 
 
 def analyze_repeat_X90_pulse(global_data_path, filename,
-                               SS=False, ef=False,
-                               gain_cutoff_low=0.0, gain_cutoff_high=1.0,
-                               extremum='auto', fit_window=3,
-                               plot_cal=False, show_plot=True,
-                               gain_offset=0.0, title_append=""):
+                              SS=False, ef=False,
+                              gain_cutoff_low=0.0, gain_cutoff_high=1.0,
+                              extremum='auto', fit_window=3,
+                              plot_cal=False, show_plot=True,
+                              gain_offset=0.0, title_append=""):
     """
-    Repeated-X90 (error amplification) pi-pulse calibration.
+    Repeated-X90 (error amplification) pulse calibration.
 
-    The experiment plays the pi pulse 2N+1 times before each readout while
-    sweeping its gain, so a fractional amplitude error eps shows up as a
-    rotation error of (2N+1)*eps instead of eps. The calibration point is the
-    gain where the signal turns over: there every pulse is a true pi rotation,
-    so the odd number of them always lands the qubit in the same state.
+    The experiment repeats the X90 pulse before each readout while sweeping
+    its gain, so a fractional amplitude error shows up multiplied by the
+    number of pulses instead of on its own.
 
-    Because the sweep is normally only a handful of points across a single
-    lobe, the turning point is located with a local quadratic fit rather than
-    a full sine fit, which needs several periods to be stable.
+    Pass a list of filenames to overlay several N on one axes - each trace
+    gets its own colour and is labelled by its 2N+1 pulse count, so the
+    sharpening of the feature with N is visible directly.
 
     Parameters
     ----------
     global_data_path : str
         Root directory for all data files.
-    filename : str
-        HDF5 filename, e.g. "00000_repeat_X90_pulse_ge_Q1_2026-08-30.h5".
+    filename : str or list of str
+        HDF5 filename, e.g. "00000_repeat_X90_pulse_ge_Q1_2026-08-30.h5", or
+        a list of them to overlay on one plot.
     SS : bool
-        True if single-shot normalisation data was collected.
+        True if single-shot normalisation data was collected. Scales the y
+        axis to qubit population instead of raw amplitude.
     ef : bool
         True if this is an e-f experiment.
     gain_cutoff_low : float
@@ -965,20 +965,16 @@ def analyze_repeat_X90_pulse(global_data_path, filename,
     gain_cutoff_high : float
         Upper bound of the gain range to include.
     extremum : {'auto', 'max', 'min'}
-        Whether the calibration point is a maximum or a minimum of the signal.
-        'auto' picks whichever candidate sits further from the sweep edges,
-        since an extremum on an edge usually means the sweep ran out of range
-        rather than a real turning point. With SS=True the pi gain is always
-        the population maximum, so 'auto' resolves to 'max'.
+        Unused while the fit is commented out.
     fit_window : int
-        Number of points either side of the extremum used for the quadratic
-        fit.
+        Unused while the fit is commented out.
     plot_cal : bool
-        If True (and SS=True), plot the g/e calibration IQ blobs and fidelity.
+        If True (and SS=True), plot the g/e calibration IQ blobs and fidelity
+        for each file.
     show_plot : bool
         If True, add a legend and display the figure.
     gain_offset : float
-        Added to the fitted pi-pulse gain.
+        Unused while the fit is commented out.
     title_append : str
         Extra text appended to the plot title.
 
@@ -987,116 +983,135 @@ def analyze_repeat_X90_pulse(global_data_path, filename,
     fig : matplotlib Figure
         Handle to the plotted figure, for further modification.
     """
-    data = _build_path(global_data_path, filename)
-    print(f"Data path: {data}")
+    # Accept a single filename or a list of them
+    filenames = [filename] if isinstance(filename, str) else list(filename)
 
-    with SlabFile(data, 'r') as f:
-        gains = np.atleast_1d(array(f['gains'])[0])
-        I = np.atleast_1d(array(f['avgi'])[0])
-        Q = np.atleast_1d(array(f['avgq'])[0])
-        amps = np.atleast_1d(array(f['amps'])[0])
-        config = _load_config(f)
+    # Explicit axes, so the figures _plot_ge_calibration opens do not steal
+    # the traces from underneath us.
+    fig, ax = plt.subplots(figsize=(12, 6))
+    colors = plt.cm.tab10(np.arange(len(filenames)) % 10)
+
+    for idx, fname in enumerate(filenames):
+        data = _build_path(global_data_path, fname)
+        print(f"Data path: {data}")
+
+        with SlabFile(data, 'r') as f:
+            gains = np.atleast_1d(array(f['gains'])[0])
+            I = np.atleast_1d(array(f['avgi'])[0])
+            Q = np.atleast_1d(array(f['avgq'])[0])
+            amps = np.atleast_1d(array(f['amps'])[0])
+            config = _load_config(f)
+
+            if SS:
+                Ig = array(f['I_g'])[0]
+                Qg = array(f['Q_g'])[0]
+                Ie = array(f['I_e'])[0]
+                Qe = array(f['Q_e'])[0]
+                If_data = array(f['I_f'])[0] if ef else None
+                Qf_data = array(f['Q_f'])[0] if ef else None
+
+        # A gain axis shorter than the measured sweep means the gain never
+        # became a QickSweep1D, so every point was taken at the same gain.
+        if gains.size != amps.size:
+            raise ValueError(
+                f"{fname}: 'gains' has {gains.size} point(s) but 'amps' has "
+                f"{amps.size}. The gain did not sweep - check that "
+                "build_task.py turns qubit_gain_ge into a QickSweep1D for "
+                "this experiment.")
+
+        N = config.get('N', None)
+        n_pulses = 2 * N + 1 if N is not None else None
 
         if SS:
-            Ig = array(f['I_g'])[0]
-            Qg = array(f['Q_g'])[0]
-            Ie = array(f['I_e'])[0]
-            Qe = array(f['Q_e'])[0]
-            If_data = array(f['I_f'])[0] if ef else None
-            Qf_data = array(f['Q_f'])[0] if ef else None
-
-    # A gain axis shorter than the measured sweep means the gain never became
-    # a QickSweep1D, so every point was taken at the same (fixed) gain.
-    if gains.size != amps.size:
-        raise ValueError(
-            f"'gains' has {gains.size} point(s) but 'amps' has {amps.size}. "
-            "The gain did not sweep - check that build_task.py turns "
-            "qubit_gain_ge into a QickSweep1D for this experiment.")
-
-    N = config.get('N', None)
-    n_pulses = 2 * N + 1 if N is not None else None
-
-    if SS:
-        if plot_cal:
-            _plot_ge_calibration(Ig, Qg, Ie, Qe, title_prefix="Repeat X90 ")
-        ydata = _normalize_population(I, Q, Ig, Qg, Ie, Qe,
-                                       ef=ef, If=If_data, Qf=Qf_data)
-    else:
-        ydata = amps
-
-    # Restrict to the requested gain window
-    cutoff = (gains >= gain_cutoff_low) & (gains <= gain_cutoff_high)
-    x = gains[cutoff]
-    y = ydata[cutoff]
-
-    # Which way does the turning point point?
-    if extremum == 'auto':
-        if SS:
-            use_max = True
+            if plot_cal:
+                _plot_ge_calibration(Ig, Qg, Ie, Qe,
+                                     title_prefix=f"Repeat X90 (N = {N}) ")
+            ydata = _normalize_population(I, Q, Ig, Qg, Ie, Qe,
+                                           ef=ef, If=If_data, Qf=Qf_data)
         else:
-            i_hi, i_lo = int(np.argmax(y)), int(np.argmin(y))
-            dist_from_edge = lambda i: min(i, len(y) - 1 - i)
-            use_max = dist_from_edge(i_hi) >= dist_from_edge(i_lo)
-    else:
-        use_max = (extremum == 'max')
-    i_ext = int(np.argmax(y)) if use_max else int(np.argmin(y))
+            ydata = amps
 
-    # Local quadratic fit around the turning point
-    lo = max(i_ext - fit_window, 0)
-    hi = min(i_ext + fit_window + 1, len(x))
-    coeffs = None
-    if hi - lo >= 3:
-        coeffs = np.polyfit(x[lo:hi], y[lo:hi], 2)
-        best_gain = -coeffs[1] / (2 * coeffs[0]) if coeffs[0] != 0 else x[i_ext]
-        # A vertex outside the fitted points means the parabola is
-        # extrapolating, so fall back to the measured extremum.
-        if not (x[lo] <= best_gain <= x[hi - 1]):
-            print("  Warning: quadratic vertex fell outside the fit window; "
-                  "using the raw extremum instead.")
-            best_gain, coeffs = x[i_ext], None
-    else:
-        print("  Warning: fewer than 3 points available; "
-              "using the raw extremum instead of a fit.")
-        best_gain = x[i_ext]
+        # Restrict to the requested gain window
+        cutoff = (gains >= gain_cutoff_low) & (gains <= gain_cutoff_high)
+        x = gains[cutoff]
+        y = ydata[cutoff]
 
-    best_gain += gain_offset
+        label = f"2N+1 = {n_pulses}" if n_pulses is not None else fname
+        ax.plot(x, y, 'o-', color=colors[idx], markersize=5, label=label)
 
-    if i_ext in (0, len(x) - 1):
-        print("  Warning: the turning point is at the edge of the sweep - "
-              "re-centre start/stop on the pi gain and re-run.")
+        step = np.mean(np.diff(x)) if len(x) > 1 else float('nan')
+        print(f"  Pulses per point: {n_pulses}  (N = {N})")
+        print(f"  Sweep window:     {x[0]:.6f} to {x[-1]:.6f} DAC units "
+              f"({len(x)} pts, step {step:.6f})")
 
-    fig = plt.figure(figsize=(12, 6))
+        # ----- fit commented out for now -----
+        #
+        # # Local quadratic fit around the turning point
+        # if extremum == 'auto':
+        #     if SS:
+        #         use_max = True
+        #     else:
+        #         i_hi, i_lo = int(np.argmax(y)), int(np.argmin(y))
+        #         dist_from_edge = lambda i: min(i, len(y) - 1 - i)
+        #         use_max = dist_from_edge(i_hi) >= dist_from_edge(i_lo)
+        # else:
+        #     use_max = (extremum == 'max')
+        # i_ext = int(np.argmax(y)) if use_max else int(np.argmin(y))
+        #
+        # lo = max(i_ext - fit_window, 0)
+        # hi = min(i_ext + fit_window + 1, len(x))
+        # coeffs = None
+        # if hi - lo >= 3:
+        #     coeffs = np.polyfit(x[lo:hi], y[lo:hi], 2)
+        #     best_gain = (-coeffs[1] / (2 * coeffs[0])
+        #                  if coeffs[0] != 0 else x[i_ext])
+        #     # A vertex outside the fitted points means the parabola is
+        #     # extrapolating, so fall back to the measured extremum.
+        #     if not (x[lo] <= best_gain <= x[hi - 1]):
+        #         print("  Warning: quadratic vertex fell outside the fit "
+        #               "window; using the raw extremum instead.")
+        #         best_gain, coeffs = x[i_ext], None
+        # else:
+        #     print("  Warning: fewer than 3 points available; "
+        #           "using the raw extremum instead of a fit.")
+        #     best_gain = x[i_ext]
+        #
+        # best_gain += gain_offset
+        #
+        # if i_ext in (0, len(x) - 1):
+        #     print("  Warning: the turning point is at the edge of the "
+        #           "sweep - re-centre start/stop and re-run.")
+        #
+        # if coeffs is not None:
+        #     x_fine = np.linspace(x[lo], x[hi - 1], 200)
+        #     ax.plot(x_fine, np.polyval(coeffs, x_fine), '-', linewidth=1.5,
+        #             color=colors[idx])
+        # ax.axvline(best_gain, color=colors[idx], linestyle='--')
+        # print(f"  Calibrated gain:  {best_gain:.6f} DAC units")
+
     if SS:
-        plt.ylabel("Qubit Population")
-        plt.axhline(1, color='black', linestyle='--')
-        plt.axhline(0, color='black', linestyle='--')
+        ax.set_ylabel("Qubit Population")
+        ax.axhline(1, color='black', linestyle='--')
+        ax.axhline(0, color='black', linestyle='--')
+        ax.axhline(0.5, color='black', linestyle='--')
     else:
-        plt.ylabel("a.u.")
-    plt.xlabel("Pulse Gain (DAC units)")
-
-    plt.plot(x, y, 'o-', color='tab:blue', markersize=5, label='data')
-    if coeffs is not None:
-        x_fine = np.linspace(x[lo], x[hi - 1], 200)
-        plt.plot(x_fine, np.polyval(coeffs, x_fine), 'r-', linewidth=1.5,
-                 label='quadratic fit')
-    plt.axvline(best_gain, c='red', linestyle='--',
-                label=f'pi pulse: {best_gain:.5f} DAC')
-
-    pulse_str = (f"{n_pulses} pulses per point (N = {N})"
-                 if n_pulses is not None else "repeated pulses")
-    plt.title(f"Repeated X90 Pi-Pulse Calibration - {pulse_str}\n" + title_append)
-
-    step = np.mean(np.diff(x)) if len(x) > 1 else float('nan')
-    print(f"  Pulses per point:   {n_pulses}")
-    print(f"  Calibrated pi gain: {best_gain:.6f} DAC units")
-    print(f"  Sweep window:       {x[0]:.6f} to {x[-1]:.6f} DAC units "
-          f"({len(x)} pts, step {step:.6f})")
-    if n_pulses is not None:
-        print(f"  Error amplification: {n_pulses}x vs. a single-pulse Rabi")
+        ax.set_ylabel("a.u.")
+    ax.set_xlabel("Pulse Gain (DAC units)")
+    ax.set_title("Repeated X90 Pulse Calibration\n" + title_append)
 
     if show_plot:
-        plt.legend()
-    _stamp_data_path(data, fig)
+        ax.legend()
+
+    if len(filenames) == 1:
+        stamp = _build_path(global_data_path, filenames[0])
+    else:
+        # Directory on the first line, then the filenames wrapped, so a long
+        # list does not run off the sides of the figure.
+        import textwrap
+        stamp = (global_data_path + chr(10)
+                 + textwrap.fill(", ".join(filenames), 110))
+    _stamp_data_path(stamp, fig)
+
     if show_plot:
         plt.show()
 

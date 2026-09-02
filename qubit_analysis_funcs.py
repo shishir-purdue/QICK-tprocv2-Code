@@ -1510,6 +1510,162 @@ def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,
     return fig
 
 
+def analyze_ramsey_freq_calibration(global_data_path, filenames,
+                                     SS=False, ef=False,
+                                     plot_each=False, plot_cal=False,
+                                     show_plot=True, title_append=""):
+    """
+    Ramsey frequency calibration.
+
+    Runs the Ramsey fit on each file of a ramsey_freq_calibration_ge sweep and
+    plots the fitted fringe frequency against the Ramsey frequency that was
+    applied. The second Ramsey pulse has its phase advanced by
+    wait_time * 360 * ramsey_freq, so a perfectly tuned qubit gives back
+    exactly the frequency that was asked for, and a detuned one gives that
+    plus a constant:
+
+        measured = applied + b
+
+    The slope is fixed at 1 rather than fitted - it is set by the phase
+    advance, not by the qubit - so b is just the mean of (measured - applied),
+    and that is the detuning offset to correct out. A slope that visibly is
+    not 1 means something other than a constant detuning is going on, so the
+    fitted slope is reported alongside for a sanity check.
+
+    Parameters
+    ----------
+    global_data_path : str
+        Root directory for all data files.
+    filenames : list of str
+        HDF5 filenames from the calibration sweep, one per applied Ramsey
+        frequency, e.g. ["00000_ramsey_freq_calibration_ge_Q1_...h5", ...].
+    SS : bool
+        True if single-shot normalisation data was collected.
+    ef : bool
+        True if these are e-f Ramsey experiments.
+    plot_each : bool
+        If True, also run analyze_t2_ramsey on every file, so each individual
+        fringe and its fit can be eyeballed.
+    plot_cal : bool
+        Passed through to analyze_t2_ramsey when plot_each is True.
+    show_plot : bool
+        If True, add a legend and display the figure.
+    title_append : str
+        Extra text appended to the plot title.
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        Handle to the summary figure.
+    applied : 1D np.array
+        Applied Ramsey frequency (MHz) for each file, in the order plotted.
+    measured : 1D np.array
+        Fitted fringe frequency (MHz) for each file, in the order plotted.
+    """
+    if isinstance(filenames, str):
+        raise TypeError(
+            "filenames must be a list, not a single string - wrap it in one: "
+            f'["{filenames}"]')
+
+    applied, measured, stamp_lines = [], [], []
+    config = {}
+
+    for fname in filenames:
+        data = _build_path(global_data_path, fname)
+        print(f"Data path: {data}")
+
+        with SlabFile(data, 'r') as f:
+            delay_times = array(f['delay_times'])[0]
+            delay_times = delay_times - delay_times[0]
+            I = array(f['avgi'])[0]
+            Q = array(f['avgq'])[0]
+            amps = array(f['amps'])[0]
+            cfg = _load_config(f)
+
+            if SS:
+                Ig = array(f['I_g'])[0]
+                Qg = array(f['Q_g'])[0]
+                Ie = array(f['I_e'])[0]
+                Qe = array(f['Q_e'])[0]
+                If_data = array(f['I_f'])[0] if ef else None
+                Qf_data = array(f['Q_f'])[0] if ef else None
+
+        if not config:
+            config = cfg
+
+        ydata = (_normalize_population(I, Q, Ig, Qg, Ie, Qe,
+                                        ef=ef, If=If_data, Qf=Qf_data)
+                 if SS else amps)
+
+        # Fit the fringe. x in ns puts fit_results['f'] in GHz, as
+        # analyze_t2_ramsey assumes when it corrects the qubit frequency.
+        x_ns = delay_times * 1000
+        fit_results = Fit().ramsey(x_ns, ydata, plot=False)
+        f_meas = fit_results['f'][0] * 1e3   # GHz -> MHz
+        f_app = cfg['ramsey_freq']
+
+        applied.append(f_app)
+        measured.append(f_meas)
+        stamp_lines.append(f"{data}  (applied = {f_app} MHz)")
+        print(f"  Applied {f_app} MHz -> measured {f_meas:.4f} MHz "
+              f"(difference {f_meas - f_app:+.4f} MHz)")
+
+        if plot_each:
+            analyze_t2_ramsey(global_data_path, fname, SS=SS, ef=ef,
+                              plot_cal=plot_cal, show_plot=show_plot)
+
+    applied = np.array(applied, dtype=float)
+    measured = np.array(measured, dtype=float)
+
+    order = np.argsort(applied)
+    applied, measured = applied[order], measured[order]
+    stamp_lines = [stamp_lines[i] for i in order]
+
+    # Slope is fixed at 1, so the intercept is just the mean difference.
+    offset = float(np.mean(measured - applied))
+    spread = (float(np.std(measured - applied, ddof=1))
+              if len(applied) > 1 else float('nan'))
+
+    # Reported only as a sanity check on the fixed-slope assumption.
+    if len(applied) > 1:
+        free_slope, free_intercept = np.polyfit(applied, measured, 1)
+    else:
+        free_slope = free_intercept = float('nan')
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.plot(applied, measured, 'o', color='tab:blue', markersize=7,
+            label='measured')
+
+    x_line = np.linspace(applied.min(), applied.max(), 100)
+    ax.plot(x_line, x_line + offset, 'r-', linewidth=1.5,
+            label=f'y = x + b,  b = {offset:+.4f} MHz')
+    ax.plot(x_line, x_line, color='gray', linestyle='--', linewidth=1,
+            label='y = x (no detuning)')
+
+    ax.set_xlabel("Applied Ramsey Frequency (MHz)")
+    ax.set_ylabel("Measured Fringe Frequency (MHz)")
+    ax.set_title(_qubit_prefix(config) + "Ramsey Frequency Calibration"
+                 + chr(10) + title_append)
+
+    print("")
+    print(f"  Offset b:            {offset:+.6f} MHz  "
+          f"(subtract from the qubit frequency)")
+    print(f"  Scatter about y=x+b: {spread:.6f} MHz")
+    print(f"  Free-fit slope:      {free_slope:.4f} "
+          f"(sanity check, should be near 1)")
+    if 'qubit_freq_ge' in config:
+        print(f"  Corrected qubit frequency: "
+              f"{config['qubit_freq_ge'] - offset:.6f} MHz")
+
+    if show_plot:
+        ax.legend()
+    _stamp_data_path(chr(10).join(stamp_lines), fig)
+    if show_plot:
+        plt.show()
+
+    return fig, applied, measured
+
+
 def analyze_t2_spin_echo(global_data_path, filename,
                           SS=False, plot_cal=False, show_plot=True):
     """

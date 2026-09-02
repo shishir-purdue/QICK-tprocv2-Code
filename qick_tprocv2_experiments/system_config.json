@@ -474,6 +474,35 @@
          "wait_time": 0.0,
          "half_pi_gain": 0.100
       },
+      "ramsey_freq_calibration_ge": {
+         "reps": 100,
+         "py_avg": 20,
+         "start": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+         ],
+         "stop": [
+            0.25,
+            1.5,
+            5,
+            5,
+            5,
+            5,
+            5,
+            5
+         ],
+         "steps": 300,
+         "ramsey_freq": 3,
+         "relax_delay": 200,
+         "wait_time": 0.0,
+         "half_pi_gain": 0.100
+      },
       "SpinEcho_ge": {
          "reps": 200,
          "py_avg": 5,

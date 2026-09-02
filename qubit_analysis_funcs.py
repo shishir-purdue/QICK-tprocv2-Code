@@ -931,14 +931,14 @@ def analyze_amplitude_rabi(global_data_path, filename,
     return fig
 
 
-def analyze_repeat_X180_pulse(global_data_path, filename,
+def analyze_repeat_X90_pulse(global_data_path, filename,
                                SS=False, ef=False,
                                gain_cutoff_low=0.0, gain_cutoff_high=1.0,
                                extremum='auto', fit_window=3,
                                plot_cal=False, show_plot=True,
                                gain_offset=0.0, title_append=""):
     """
-    Repeated-X180 (error amplification) pi-pulse calibration.
+    Repeated-X90 (error amplification) pi-pulse calibration.
 
     The experiment plays the pi pulse 2N+1 times before each readout while
     sweeping its gain, so a fractional amplitude error eps shows up as a
@@ -955,7 +955,7 @@ def analyze_repeat_X180_pulse(global_data_path, filename,
     global_data_path : str
         Root directory for all data files.
     filename : str
-        HDF5 filename, e.g. "00000_repeat_X180_pulse_ge_Q1_2026-08-30.h5".
+        HDF5 filename, e.g. "00000_repeat_X90_pulse_ge_Q1_2026-08-30.h5".
     SS : bool
         True if single-shot normalisation data was collected.
     ef : bool
@@ -1018,7 +1018,7 @@ def analyze_repeat_X180_pulse(global_data_path, filename,
 
     if SS:
         if plot_cal:
-            _plot_ge_calibration(Ig, Qg, Ie, Qe, title_prefix="Repeat X180 ")
+            _plot_ge_calibration(Ig, Qg, Ie, Qe, title_prefix="Repeat X90 ")
         ydata = _normalize_population(I, Q, Ig, Qg, Ie, Qe,
                                        ef=ef, If=If_data, Qf=Qf_data)
     else:
@@ -1084,7 +1084,7 @@ def analyze_repeat_X180_pulse(global_data_path, filename,
 
     pulse_str = (f"{n_pulses} pulses per point (N = {N})"
                  if n_pulses is not None else "repeated pulses")
-    plt.title(f"Repeated X180 Pi-Pulse Calibration - {pulse_str}\n" + title_append)
+    plt.title(f"Repeated X90 Pi-Pulse Calibration - {pulse_str}\n" + title_append)
 
     step = np.mean(np.diff(x)) if len(x) > 1 else float('nan')
     print(f"  Pulses per point:   {n_pulses}")

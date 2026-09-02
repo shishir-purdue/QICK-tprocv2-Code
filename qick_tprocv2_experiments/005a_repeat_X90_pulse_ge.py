@@ -1,5 +1,5 @@
 """
-005a_repeat_X180_pulse_ge - Repeated X180 Pi-Pulse Calibration for ge state
+005a_repeat_X90_pulse_ge - Repeated X90 Pi-Pulse Calibration for ge state
 
 This experiment sweeps the pi-pulse gain while playing the pi pulse 2N+1 times
 before each readout, so that a small amplitude error accumulates into a
@@ -57,7 +57,7 @@ if SS == 'True':
     from SingleShot import config as ss_config
 
 # ----- Experiment configurations ----- #
-expt_name = "repeat_X180_pulse_ge"
+expt_name = "repeat_X90_pulse_ge"
 config, expt_name = initialize_configs(expt_name)
 print(expt_name + '\n')
 print(config)
@@ -92,7 +92,7 @@ class RepeatPulseProgram(AveragerProgramV2):
 # Run the Program
 ###################
 
-repeat_X180_program=RepeatPulseProgram(soccfg, reps=config['reps'], final_delay=config['relax_delay'], cfg=config)
+repeat_X90_program=RepeatPulseProgram(soccfg, reps=config['reps'], final_delay=config['relax_delay'], cfg=config)
 py_avg = config['py_avg']
 
 # for live plotting
@@ -103,11 +103,11 @@ if IS_VISDOM:
     assert viz.check_connection(timeout_seconds=5), "Visdom server not connected!"
     viz.close(win=None) # close previous plots
     win1 = viz.line( X=np.arange(0, 1), Y=np.arange(0, 1),
-        opts=dict(height=400, width=700, title='Repeat X180 Pulse Experiment', showlegend=True, xlabel='expt_pts'))
+        opts=dict(height=400, width=700, title='Repeat X90 Pulse Experiment', showlegend=True, xlabel='expt_pts'))
 
     for ii in range(py_avg):
-        iq_list = repeat_X180_program.acquire(soc, soft_avgs=1, progress=False)
-        gains = repeat_X180_program.get_pulse_param('qubit_pulse', "gain", as_array=True)
+        iq_list = repeat_X90_program.acquire(soc, soft_avgs=1, progress=False)
+        gains = repeat_X90_program.get_pulse_param('qubit_pulse', "gain", as_array=True)
 
         if MUX == 'False':
             iq_list = iq_list[0][0].T
@@ -128,13 +128,13 @@ if IS_VISDOM:
         expt_phases = np.angle(expt_I + 1j * expt_Q)  # phase
 
         viz.line(X = gains, Y = expt_mags, win=win1, name='I',
-        opts=dict(height=400, width=700, title='Repeat X180 Pulse Experiment', showlegend=True, xlabel='expt_pts'))
+        opts=dict(height=400, width=700, title='Repeat X90 Pulse Experiment', showlegend=True, xlabel='expt_pts'))
 
     amps = np.abs(expt_I + 1j*expt_Q)
     
 else:
-    iq_list = np.array(repeat_X180_program.acquire(soc, soft_avgs=py_avg, progress=True))
-    gains = repeat_X180_program.get_pulse_param('qubit_pulse', "gain", as_array=True)
+    iq_list = np.array(repeat_X90_program.acquire(soc, soft_avgs=py_avg, progress=True))
+    gains = repeat_X90_program.get_pulse_param('qubit_pulse', "gain", as_array=True)
     amps = np.abs(iq_list[0][0].dot([1,1j]))
 
 # fit = Fit()

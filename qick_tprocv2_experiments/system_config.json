@@ -381,7 +381,7 @@
          "steps": 150,
          "relax_delay": 200
       },
-      "repeat_X180_pulse_ge": {
+      "repeat_X90_pulse_ge": {
          "reps": 100,
          "py_avg": 10,
          "start": [

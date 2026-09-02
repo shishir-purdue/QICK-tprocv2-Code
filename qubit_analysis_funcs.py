@@ -936,7 +936,7 @@ def analyze_repeat_X90_pulse(global_data_path, filenames,
                               gain_cutoff_low=0.0, gain_cutoff_high=1.0,
                               extremum='auto', fit_window=3,
                               plot_cal=False, show_plot=True,
-                              gain_offset=0.0, title_append=""):
+                              gain_offset=0.0, title_append="", vline = None):
     """
     Repeated-X90 (error amplification) pulse calibration.
 
@@ -978,6 +978,9 @@ def analyze_repeat_X90_pulse(global_data_path, filenames,
         Unused while the fit is commented out.
     title_append : str
         Extra text appended to the plot title.
+    vline : float or None
+        If given, draw a red dashed vertical line at this gain. Tune it by eye
+        to read off where the traces cross.
 
     Returns
     -------
@@ -993,6 +996,7 @@ def analyze_repeat_X90_pulse(global_data_path, filenames,
     # the traces from underneath us.
     fig, ax = plt.subplots(figsize=(12, 6))
     colors = plt.cm.tab10(np.arange(len(filenames)) % 10)
+    stamp_lines = []
 
     for idx, fname in enumerate(filenames):
         data = _build_path(global_data_path, fname)
@@ -1039,8 +1043,10 @@ def analyze_repeat_X90_pulse(global_data_path, filenames,
         x = gains[cutoff]
         y = ydata[cutoff]
 
-        label = f"2N+1 = {n_pulses}" if n_pulses is not None else fname
+        label = f"N = {n_pulses}" if n_pulses is not None else fname
         ax.plot(x, y, 'o-', color=colors[idx], markersize=5, label=label)
+
+        stamp_lines.append(f"{data}  (N = {n_pulses})")
 
         step = np.mean(np.diff(x)) if len(x) > 1 else float('nan')
         print(f"  Pulses per point: {n_pulses}  (N = {N})")
@@ -1102,18 +1108,15 @@ def analyze_repeat_X90_pulse(global_data_path, filenames,
     ax.set_xlabel("Pulse Gain (DAC units)")
     ax.set_title("Repeated X90 Pulse Calibration\n" + title_append)
 
+    if vline is not None:
+        ax.axvline(vline, color='red', linestyle='--',
+                   label=f'gain = {vline:.5f}')
+
     if show_plot:
         ax.legend()
 
-    if len(filenames) == 1:
-        stamp = _build_path(global_data_path, filenames[0])
-    else:
-        # Directory on the first line, then the filenames wrapped, so a long
-        # list does not run off the sides of the figure.
-        import textwrap
-        stamp = (global_data_path + chr(10)
-                 + textwrap.fill(", ".join(filenames), 110))
-    _stamp_data_path(stamp, fig)
+    # One data path per line, each tagged with its pulse count
+    _stamp_data_path(chr(10).join(stamp_lines), fig)
 
     if show_plot:
         plt.show()

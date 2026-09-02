@@ -43,6 +43,7 @@ def add_qubit_cfg(system_config, QubitIndex):
     qubit_config = copy.deepcopy(system_config['qubit_cfg'])
     var = ["qubit_freq_ge", "qubit_freq_ef", 
            "qubit_gain_ge", "qubit_gain_ef",
+           "half_pi_gain_ge",
            "sigma_ge", "sigma_ef"]
     for Index in var:
         value = qubit_config[Index][QubitIndex]

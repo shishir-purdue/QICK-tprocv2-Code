@@ -144,6 +144,18 @@ def _load_config(slab_file_handle):
     return json.loads(slab_file_handle.attrs['config'])
 
 
+def _qubit_prefix(config):
+    """
+    "Q1 - " for a config that recorded its qubit index, "" otherwise.
+
+    initialize_configs only stores 'qubit_index' for non-MUX experiments, and
+    files taken before it did so have no such key, so this quietly returns an
+    empty string rather than guessing.
+    """
+    qubit_index = config.get('qubit_index', None)
+    return f"Q{qubit_index} - " if qubit_index is not None else ""
+
+
 def _stamp_data_path(data_path, fig=None):
     """Print the source data path in small text at the bottom of the figure."""
     if fig is None:
@@ -433,7 +445,7 @@ def analyze_time_of_flight(global_data_path, filename, show_plot=True):
         plt.legend()
     plt.ylabel("ADC Units")
     plt.xlabel("us")
-    plt.title("Time of Flight Experiment")
+    plt.title(_qubit_prefix(config) + "Time of Flight Experiment")
     _stamp_data_path(data)
     if show_plot:
         plt.show()
@@ -493,7 +505,7 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
     plt.plot(freqs, amps_db if logscale else amps, marker='o', label='data')
     plt.ylabel("dB" if logscale else "a.u.")
     plt.xlabel("Resonator Frequency (MHz)")
-    plt.title(f"Resonator Spectroscopy, Gain = {config['res_gain_ge']}")
+    plt.title(_qubit_prefix(config) + f"Resonator Spectroscopy, Gain = {config['res_gain_ge']}")
 
     if fit_resonator:
         freqs_fit = np.linspace(freqs[0], freqs[-1], 1000)
@@ -555,7 +567,7 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
     plt.plot(freqs, np.unwrap(phases), marker='o', label='phase data')
     plt.ylabel("radians")
     plt.xlabel("Resonator Frequency (MHz)")
-    plt.title("Resonator Spectroscopy Phase")
+    plt.title(_qubit_prefix(config) + "Resonator Spectroscopy Phase")
     _stamp_data_path(data)
     if show_plot:
         plt.show()
@@ -611,7 +623,7 @@ def analyze_qubit_spectroscopy(global_data_path, filename,
 
     if SS:
         if plot_cal:
-            _plot_ge_calibration(Ig, Qg, Ie, Qe, title_prefix="Qubit Spec ")
+            _plot_ge_calibration(Ig, Qg, Ie, Qe, title_prefix=_qubit_prefix(config) + "Qubit Spec ")
         ydata = _normalize_population(I, Q, Ig, Qg, Ie, Qe,
                                        ef=ef, If=If_data, Qf=Qf_data)
     else:
@@ -625,7 +637,7 @@ def analyze_qubit_spectroscopy(global_data_path, filename,
     else:
         plt.ylabel("a.u.")
     plt.xlabel("Qubit Frequency (MHz)")
-    plt.title(f"Qubit Spectroscopy:  Gain = {config['qubit_gain_ge']}, "
+    plt.title(_qubit_prefix(config) + f"Qubit Spectroscopy:  Gain = {config['qubit_gain_ge']}, "
               f"Sigma (us) = {config['sigma_ge']}, DAC (mA) = {dac}")
 
     fit = Fit()
@@ -693,10 +705,13 @@ def analyze_qubit_spec_temporal_scan(global_data_path, folder_name,
     peaks = []
     amps_list = []
     freqs_ref = None
+    config = {}
     for fname in files:
         with SlabFile(os.path.join(folder_path, fname), 'r') as f:
             freqs = array(f['fpts'])[0]
             amps = array(f['amps'])[0]
+            if not config:
+                config = _load_config(f)
 
         if freqs_ref is None:
             freqs_ref = freqs
@@ -727,7 +742,7 @@ def analyze_qubit_spec_temporal_scan(global_data_path, folder_name,
     plt.plot(time_axis, peaks, marker='o', linestyle='-', c='red', label='peak')
     plt.xlabel("Elapsed Time (min)")
     plt.ylabel("Qubit Frequency (MHz)")
-    plt.title(f"Qubit Spectroscopy Temporal Scan ({len(files)} measurements, "
+    plt.title(_qubit_prefix(config) + f"Qubit Spectroscopy Temporal Scan ({len(files)} measurements, "
               f"{time_spacing_min:.1f} min spacing)")
     if show_plot:
         plt.legend()
@@ -786,7 +801,7 @@ def analyze_length_rabi(global_data_path, filename,
 
     if SS:
         if plot_cal:
-            _plot_ge_calibration(Ig, Qg, Ie, Qe, title_prefix="Length Rabi ")
+            _plot_ge_calibration(Ig, Qg, Ie, Qe, title_prefix=_qubit_prefix(config) + "Length Rabi ")
         ydata = _normalize_population(I, Q, Ig, Qg, Ie, Qe,
                                        ef=ef, If=If_data, Qf=Qf_data)
     else:
@@ -801,7 +816,7 @@ def analyze_length_rabi(global_data_path, filename,
     else:
         plt.ylabel("a.u.")
     plt.xlabel(r"Pulse Length ($\mu s$)")
-    plt.title(f"Length Rabi Oscillations (Qubit gain = {config['qubit_gain_ge']:.2f})")
+    plt.title(_qubit_prefix(config) + f"Length Rabi Oscillations (Qubit gain = {config['qubit_gain_ge']:.2f})")
 
     # Fit with decaying sinusoid
     fit_results = fitdecaysin(lengths, ydata, showfit=show_plot)
@@ -886,7 +901,7 @@ def analyze_amplitude_rabi(global_data_path, filename,
 
     if SS:
         if plot_cal:
-            _plot_ge_calibration(Ig, Qg, Ie, Qe, title_prefix="Amp Rabi ")
+            _plot_ge_calibration(Ig, Qg, Ie, Qe, title_prefix=_qubit_prefix(config) + "Amp Rabi ")
         ydata = _normalize_population(I, Q, Ig, Qg, Ie, Qe,
                                        ef=ef, If=If_data, Qf=Qf_data)
     else:
@@ -921,7 +936,7 @@ def analyze_amplitude_rabi(global_data_path, filename,
     plt.axvline(peak, c='red', label=f'pi pulse: {peak:.3f} DAC')
     plt.axvline(half_pi, c='red', linestyle='--',
                 label=f'pi/2 pulse: {half_pi:.3f} DAC')
-    plt.title(f"Amplitude Rabi Oscillations (Sigma = {config['sigma_ge']:.5f})\n" + title_append)
+    plt.title(_qubit_prefix(config) + f"Amplitude Rabi Oscillations (Sigma = {config['sigma_ge']:.5f})\n" + title_append)
     if show_plot:
         plt.legend()
     _stamp_data_path(data)
@@ -1032,7 +1047,7 @@ def analyze_repeat_X90_pulse(global_data_path, filenames,
         if SS:
             if plot_cal:
                 _plot_ge_calibration(Ig, Qg, Ie, Qe,
-                                     title_prefix=f"Repeat X90 (N = {N}) ")
+                                     title_prefix=_qubit_prefix(config) + f"Repeat X90 (N = {N}) ")
             ydata = _normalize_population(I, Q, Ig, Qg, Ie, Qe,
                                            ef=ef, If=If_data, Qf=Qf_data)
         else:
@@ -1106,7 +1121,7 @@ def analyze_repeat_X90_pulse(global_data_path, filenames,
     else:
         ax.set_ylabel("a.u.")
     ax.set_xlabel("Pulse Gain (DAC units)")
-    ax.set_title("Repeated X90 Pulse Calibration\n" + title_append)
+    ax.set_title(_qubit_prefix(config) + "Repeated X90 Pulse Calibration\n" + title_append)
 
     if vline is not None:
         ax.axvline(vline, color='red', linestyle='--',
@@ -1304,7 +1319,7 @@ def analyze_repeat_X180_pulse(global_data_path, filenames,
         if SS:
             if plot_cal:
                 _plot_ge_calibration(Ig, Qg, Ie, Qe,
-                                     title_prefix=f"Repeat X180 (N = {N}) ")
+                                     title_prefix=_qubit_prefix(config) + f"Repeat X180 (N = {N}) ")
             ydata = _normalize_population(I, Q, Ig, Qg, Ie, Qe,
                                            ef=ef, If=If_data, Qf=Qf_data)
         else:
@@ -1378,7 +1393,7 @@ def analyze_repeat_X180_pulse(global_data_path, filenames,
     else:
         ax.set_ylabel("a.u.")
     ax.set_xlabel("Pulse Gain (DAC units)")
-    ax.set_title("Repeated X180 Pulse Calibration\n" + title_append)
+    ax.set_title(_qubit_prefix(config) + "Repeated X180 Pulse Calibration\n" + title_append)
 
     if vline is not None:
         ax.axvline(vline, color='red', linestyle='--',
@@ -1445,7 +1460,7 @@ def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,
 
     if SS:
         if plot_cal:
-            _plot_ge_calibration(Ig, Qg, Ie, Qe, title_prefix="Ramsey ")
+            _plot_ge_calibration(Ig, Qg, Ie, Qe, title_prefix=_qubit_prefix(config) + "Ramsey ")
         ydata = _normalize_population(I, Q, Ig, Qg, Ie, Qe,
                                        ef=ef, If=If_data, Qf=Qf_data)
     else:
@@ -1462,7 +1477,7 @@ def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,
     else:
         plt.ylabel("a.u.")
     plt.xlabel("Delay Time (ns)")
-    plt.title(f"Ramsey Fringe Experiment, (Ramsey frequency = {config['ramsey_freq']:.2f} MHz)"
+    plt.title(_qubit_prefix(config) + f"Ramsey Fringe Experiment, (Ramsey frequency = {config['ramsey_freq']:.2f} MHz)"
               f"\n$\\sigma$ = {config['sigma_ge']:.2f} $\\mu$s"
               f", $\\pi / 2$ Gain = {config['half_pi_gain']}")
 
@@ -1537,7 +1552,7 @@ def analyze_t2_spin_echo(global_data_path, filename,
 
     if SS:
         if plot_cal:
-            _plot_ge_calibration(Ig, Qg, Ie, Qe, title_prefix="Spin Echo ")
+            _plot_ge_calibration(Ig, Qg, Ie, Qe, title_prefix=_qubit_prefix(config) + "Spin Echo ")
         ydata = _normalize_population(I, Q, Ig, Qg, Ie, Qe)
     else:
         ydata = amps
@@ -1551,7 +1566,7 @@ def analyze_t2_spin_echo(global_data_path, filename,
     else:
         plt.ylabel("a.u.")
     plt.xlabel(r"Delay Time ($\mu$s)")
-    plt.title("Spin Echo Experiment")
+    plt.title(_qubit_prefix(config) + "Spin Echo Experiment")
     if show_plot:
         plt.legend()
 
@@ -1607,7 +1622,7 @@ def analyze_t1(global_data_path, filename,
 
     if SS:
         if plot_cal:
-            _plot_ge_calibration(Ig, Qg, Ie, Qe, title_prefix="T1 ")
+            _plot_ge_calibration(Ig, Qg, Ie, Qe, title_prefix=_qubit_prefix(config) + "T1 ")
         ydata = _normalize_population(I, Q, Ig, Qg, Ie, Qe)
     else:
         ydata = amps
@@ -1623,7 +1638,7 @@ def analyze_t1(global_data_path, filename,
     else:
         plt.ylabel("a.u.")
     plt.xlabel("Delay Time (ns)")
-    plt.title(f"T1 Experiment: Gain = {config['qubit_gain_ge']}, "
+    plt.title(_qubit_prefix(config) + f"T1 Experiment: Gain = {config['qubit_gain_ge']}, "
               f"Sigma (us) = {config['sigma_ge']}")
     if show_plot:
         plt.legend()
@@ -1684,10 +1699,13 @@ def analyze_T1_temporal_scan(global_data_path, folder_name,
 
     T1_values = []
     T1_errors = []
+    config = {}
     for fname in files:
         with SlabFile(os.path.join(folder_path, fname), 'r') as f:
             delay_times = array(f['delay_times'])[0]
             amps = array(f['amps'])[0]
+            if not config:
+                config = _load_config(f)
 
         x_ns = delay_times * 1000  # us -> ns
 
@@ -1713,7 +1731,7 @@ def analyze_T1_temporal_scan(global_data_path, folder_name,
         plt.plot(time_axis, T1_values/1e3, marker='o', linestyle='-', label='T1')
     plt.xlabel("Elapsed Time (min)")
     plt.ylabel(r"T1 ($\mu s$)")
-    plt.title(f"T1 Temporal Scan ({len(files)} measurements, "
+    plt.title(_qubit_prefix(config) + f"T1 Temporal Scan ({len(files)} measurements, "
               f"{time_spacing_min:.1f} min spacing)")
     if show_plot:
         plt.legend()
@@ -1776,7 +1794,7 @@ def analyze_single_shot(global_data_path, filename,
 
     # IQ scatter plot
     fig = plt.figure()
-    plt.title("IQ Plot")
+    plt.title(_qubit_prefix(config) + "IQ Plot")
     plt.plot(I_g, Q_g, '.', label='g')
     plt.plot(I_e, Q_e, '.', label='e')
     if ef:
@@ -1962,11 +1980,11 @@ def analyze_readout_optimization(global_data_path, filename,
     plt.ylabel("Gain, DAC Unit")
     plt.xlabel("Frequency, (MHz)")
     if ge:
-        plt.title("Fidelity, Discriminate g-e")
+        plt.title(_qubit_prefix(config) + "Fidelity, Discriminate g-e")
     elif gf:
-        plt.title("Fidelity, Discriminate g-f")
+        plt.title(_qubit_prefix(config) + "Fidelity, Discriminate g-f")
     elif ef:
-        plt.title("Fidelity, Discriminate e-f")
+        plt.title(_qubit_prefix(config) + "Fidelity, Discriminate e-f")
     plt.colorbar(figA)
     _stamp_data_path(data)
     if show_plot:
@@ -2045,7 +2063,7 @@ def inspect_readout_optimization_point(global_data_path, filename,
 
     # IQ scatter
     fig = plt.figure()
-    plt.title(f"IQ Plot\nGain = {gain_val}, Frequency = {freq_val} MHz")
+    plt.title(_qubit_prefix(config) + f"IQ Plot\nGain = {gain_val}, Frequency = {freq_val} MHz")
     plt.plot(I_g, Q_g, '.', label='g', zorder=1)
     plt.plot(I_e, Q_e, '.', label='e', zorder=2)
     plt.xlabel("I")

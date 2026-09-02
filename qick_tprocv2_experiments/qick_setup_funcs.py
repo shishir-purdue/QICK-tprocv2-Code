@@ -79,6 +79,9 @@ def initialize_configs(expt_name):
     else: # non-MUX experiments
         q_config = all_qubit_state(system_config)
         config = {**q_config['Q' + str(QUBIT_INDEX)], **exp_cfg}
+        # Record which qubit this is, so the saved h5 config says so and the
+        # analysis can label its plots without parsing the filename.
+        config.update([('qubit_index', QUBIT_INDEX)])
     
     return config, expt_name
 

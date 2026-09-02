@@ -1203,6 +1203,199 @@ def analyze_repeat_X90_pulse(global_data_path, filenames,
 # =============================================================================
 
 
+def analyze_repeat_X180_pulse(global_data_path, filenames,
+                              SS=False, ef=False,
+                              gain_cutoff_low=0.0, gain_cutoff_high=1.0,
+                              extremum='auto', fit_window=3,
+                              plot_cal=False, show_plot=True,
+                              gain_offset=0.0, title_append="", vline = None):
+    """
+    Repeated-X180 (error amplification) pulse calibration.
+
+    The experiment repeats the X180 pulse before each readout while sweeping
+    its gain, so a fractional amplitude error shows up multiplied by the
+    number of pulses instead of on its own.
+
+    Pass a list of filenames to overlay several N on one axes - each trace
+    gets its own colour and is labelled by its 2N+1 pulse count, so the
+    sharpening of the feature with N is visible directly.
+
+    Parameters
+    ----------
+    global_data_path : str
+        Root directory for all data files.
+    filenames : list of str
+        HDF5 filenames to overlay on one plot, e.g.
+        ["00000_repeat_X180_pulse_ge_Q1_2026-09-02.h5", ...]. Always a list -
+        wrap a single file in one.
+    SS : bool
+        True if single-shot normalisation data was collected. Scales the y
+        axis to qubit population instead of raw amplitude.
+    ef : bool
+        True if this is an e-f experiment.
+    gain_cutoff_low : float
+        Lower bound of the gain range to include.
+    gain_cutoff_high : float
+        Upper bound of the gain range to include.
+    extremum : {'auto', 'max', 'min'}
+        Unused while the fit is commented out.
+    fit_window : int
+        Unused while the fit is commented out.
+    plot_cal : bool
+        If True (and SS=True), plot the g/e calibration IQ blobs and fidelity
+        for each file.
+    show_plot : bool
+        If True, add a legend and display the figure.
+    gain_offset : float
+        Unused while the fit is commented out.
+    title_append : str
+        Extra text appended to the plot title.
+    vline : float or None
+        If given, draw a red dashed vertical line at this gain. Tune it by eye
+        to read off where the traces cross.
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        Handle to the plotted figure, for further modification.
+    """
+    if isinstance(filenames, str):
+        raise TypeError(
+            "filenames must be a list, not a single string - wrap it in one: "
+            f'["{filenames}"]')
+
+    # Explicit axes, so the figures _plot_ge_calibration opens do not steal
+    # the traces from underneath us.
+    fig, ax = plt.subplots(figsize=(12, 6))
+    colors = plt.cm.tab10(np.arange(len(filenames)) % 10)
+    stamp_lines = []
+
+    for idx, fname in enumerate(filenames):
+        data = _build_path(global_data_path, fname)
+        print(f"Data path: {data}")
+
+        with SlabFile(data, 'r') as f:
+            gains = np.atleast_1d(array(f['gains'])[0])
+            I = np.atleast_1d(array(f['avgi'])[0])
+            Q = np.atleast_1d(array(f['avgq'])[0])
+            amps = np.atleast_1d(array(f['amps'])[0])
+            config = _load_config(f)
+
+            if SS:
+                Ig = array(f['I_g'])[0]
+                Qg = array(f['Q_g'])[0]
+                Ie = array(f['I_e'])[0]
+                Qe = array(f['Q_e'])[0]
+                If_data = array(f['I_f'])[0] if ef else None
+                Qf_data = array(f['Q_f'])[0] if ef else None
+
+        # A gain axis shorter than the measured sweep means the gain never
+        # became a QickSweep1D, so every point was taken at the same gain.
+        if gains.size != amps.size:
+            raise ValueError(
+                f"{fname}: 'gains' has {gains.size} point(s) but 'amps' has "
+                f"{amps.size}. The gain did not sweep - check that "
+                "build_task.py turns qubit_gain_ge into a QickSweep1D for "
+                "this experiment.")
+
+        N = config.get('N', None)
+        n_pulses = 2 * N + 1 if N is not None else None
+
+        if SS:
+            if plot_cal:
+                _plot_ge_calibration(Ig, Qg, Ie, Qe,
+                                     title_prefix=f"Repeat X180 (N = {N}) ")
+            ydata = _normalize_population(I, Q, Ig, Qg, Ie, Qe,
+                                           ef=ef, If=If_data, Qf=Qf_data)
+        else:
+            ydata = amps
+
+        # Restrict to the requested gain window
+        cutoff = (gains >= gain_cutoff_low) & (gains <= gain_cutoff_high)
+        x = gains[cutoff]
+        y = ydata[cutoff]
+
+        label = f"N = {n_pulses}" if n_pulses is not None else fname
+        ax.plot(x, y, 'o-', color=colors[idx], markersize=5, label=label)
+
+        stamp_lines.append(f"{data}  (N = {n_pulses})")
+
+        step = np.mean(np.diff(x)) if len(x) > 1 else float('nan')
+        print(f"  Pulses per point: {n_pulses}  (N = {N})")
+        print(f"  Sweep window:     {x[0]:.6f} to {x[-1]:.6f} DAC units "
+              f"({len(x)} pts, step {step:.6f})")
+
+        # ----- fit commented out for now -----
+        #
+        # # Local quadratic fit around the turning point
+        # if extremum == 'auto':
+        #     if SS:
+        #         use_max = True
+        #     else:
+        #         i_hi, i_lo = int(np.argmax(y)), int(np.argmin(y))
+        #         dist_from_edge = lambda i: min(i, len(y) - 1 - i)
+        #         use_max = dist_from_edge(i_hi) >= dist_from_edge(i_lo)
+        # else:
+        #     use_max = (extremum == 'max')
+        # i_ext = int(np.argmax(y)) if use_max else int(np.argmin(y))
+        #
+        # lo = max(i_ext - fit_window, 0)
+        # hi = min(i_ext + fit_window + 1, len(x))
+        # coeffs = None
+        # if hi - lo >= 3:
+        #     coeffs = np.polyfit(x[lo:hi], y[lo:hi], 2)
+        #     best_gain = (-coeffs[1] / (2 * coeffs[0])
+        #                  if coeffs[0] != 0 else x[i_ext])
+        #     # A vertex outside the fitted points means the parabola is
+        #     # extrapolating, so fall back to the measured extremum.
+        #     if not (x[lo] <= best_gain <= x[hi - 1]):
+        #         print("  Warning: quadratic vertex fell outside the fit "
+        #               "window; using the raw extremum instead.")
+        #         best_gain, coeffs = x[i_ext], None
+        # else:
+        #     print("  Warning: fewer than 3 points available; "
+        #           "using the raw extremum instead of a fit.")
+        #     best_gain = x[i_ext]
+        #
+        # best_gain += gain_offset
+        #
+        # if i_ext in (0, len(x) - 1):
+        #     print("  Warning: the turning point is at the edge of the "
+        #           "sweep - re-centre start/stop and re-run.")
+        #
+        # if coeffs is not None:
+        #     x_fine = np.linspace(x[lo], x[hi - 1], 200)
+        #     ax.plot(x_fine, np.polyval(coeffs, x_fine), '-', linewidth=1.5,
+        #             color=colors[idx])
+        # ax.axvline(best_gain, color=colors[idx], linestyle='--')
+        # print(f"  Calibrated gain:  {best_gain:.6f} DAC units")
+
+    if SS:
+        ax.set_ylabel("Qubit Population")
+        ax.axhline(1, color='black', linestyle='--')
+        ax.axhline(0, color='black', linestyle='--')
+        ax.axhline(0.5, color='black', linestyle='--')
+    else:
+        ax.set_ylabel("a.u.")
+    ax.set_xlabel("Pulse Gain (DAC units)")
+    ax.set_title("Repeated X180 Pulse Calibration\n" + title_append)
+
+    if vline is not None:
+        ax.axvline(vline, color='red', linestyle='--',
+                   label=f'gain = {vline:.5f}')
+
+    if show_plot:
+        ax.legend()
+
+    # One data path per line, each tagged with its pulse count
+    _stamp_data_path(chr(10).join(stamp_lines), fig)
+
+    if show_plot:
+        plt.show()
+
+    return fig
+
+
 def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,
                        SS=False, ef=False,
                        plot_cal=False, show_plot=True):

@@ -54,7 +54,8 @@ def add_single_qubit_experiment(expt_cfg, expt_name, QubitIndex):
         expt_cfg.update([('qubit_freq_ge', QickSweep1D('freqloop', start, stop))])
     elif expt_name == 'time_rabi_ge' or expt_name == 'qubit_temp':
         expt_cfg.update([('expts', expts), ('start', start)])
-    elif expt_name == 'power_rabi_ge' or expt_name == 'repeat_X90_pulse_ge':
+    elif expt_name in ('power_rabi_ge', 'repeat_X90_pulse_ge',
+                       'repeat_X180_pulse_ge'):
         expt_cfg.update([('qubit_gain_ge', QickSweep1D('gainloop', start, stop))])
     elif expt_name == 'Ramsey_ge' or expt_name == 'SpinEcho_ge' or expt_name == 'T1_ge' or expt_name == 'Ramsey_ef':
         expt_cfg.update([('wait_time', QickSweep1D('waitloop', start, stop))])

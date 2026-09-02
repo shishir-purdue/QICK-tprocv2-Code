@@ -931,7 +931,7 @@ def analyze_amplitude_rabi(global_data_path, filename,
     return fig
 
 
-def analyze_repeat_X90_pulse(global_data_path, filename,
+def analyze_repeat_X90_pulse(global_data_path, filenames,
                               SS=False, ef=False,
                               gain_cutoff_low=0.0, gain_cutoff_high=1.0,
                               extremum='auto', fit_window=3,
@@ -952,9 +952,10 @@ def analyze_repeat_X90_pulse(global_data_path, filename,
     ----------
     global_data_path : str
         Root directory for all data files.
-    filename : str or list of str
-        HDF5 filename, e.g. "00000_repeat_X90_pulse_ge_Q1_2026-08-30.h5", or
-        a list of them to overlay on one plot.
+    filenames : list of str
+        HDF5 filenames to overlay on one plot, e.g.
+        ["00000_repeat_X90_pulse_ge_Q1_2026-08-30.h5", ...]. Always a list -
+        wrap a single file in one.
     SS : bool
         True if single-shot normalisation data was collected. Scales the y
         axis to qubit population instead of raw amplitude.
@@ -983,8 +984,10 @@ def analyze_repeat_X90_pulse(global_data_path, filename,
     fig : matplotlib Figure
         Handle to the plotted figure, for further modification.
     """
-    # Accept a single filename or a list of them
-    filenames = [filename] if isinstance(filename, str) else list(filename)
+    if isinstance(filenames, str):
+        raise TypeError(
+            "filenames must be a list, not a single string - wrap it in one: "
+            f'["{filenames}"]')
 
     # Explicit axes, so the figures _plot_ge_calibration opens do not steal
     # the traces from underneath us.

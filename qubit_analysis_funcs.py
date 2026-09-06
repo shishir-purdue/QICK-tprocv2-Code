@@ -455,7 +455,8 @@ def analyze_time_of_flight(global_data_path, filename, show_plot=True):
 
 def analyze_resonator_spectroscopy(global_data_path, filename,
                                     fit_resonator=True, fit_method='circle',
-                                    logscale=False, show_plot=True):
+                                    logscale=False, show_plot=True,
+                                    perform_fit=True):
     """
     Single-resonator spectroscopy (amplitude + phase).
 
@@ -465,6 +466,9 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
         Root directory for all data files.
     filename : str
         HDF5 filename, e.g. "00000_res_spec_ge_Q1_2026-06-06.h5".
+    perform_fit : bool
+        If True (default), fit the resonator and draw the fit. If False, only
+        the data is plotted - same scaling, labels and stamp, no fit.
     fit_resonator : bool
         If True, fit the resonator lineshape using ``fit_method``.
     fit_method : str
@@ -507,7 +511,7 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
     plt.xlabel("Resonator Frequency (MHz)")
     plt.title(_qubit_prefix(config) + f"Resonator Spectroscopy, Gain = {config['res_gain_ge']}")
 
-    if fit_resonator:
+    if perform_fit and fit_resonator:
         freqs_fit = np.linspace(freqs[0], freqs[-1], 1000)
 
         if fit_method == 'circle':
@@ -577,7 +581,8 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
 
 def analyze_qubit_spectroscopy(global_data_path, filename,
                                 SS=False, ef=False, dac=0.0,
-                                plot_cal=False, show_plot=True):
+                                plot_cal=False, show_plot=True,
+                                perform_fit=True):
     """
     Single-qubit spectroscopy.
 
@@ -597,6 +602,9 @@ def analyze_qubit_spectroscopy(global_data_path, filename,
         If True (and SS=True), plot the g/e calibration IQ blobs and fidelity.
     show_plot : bool
         If True, add a legend and display the figure.
+    perform_fit : bool
+        If True (default), fit the data and draw the fit. If False, only the
+        data is plotted - same scaling, labels and stamp, no fit.
 
     Returns
     -------
@@ -640,11 +648,12 @@ def analyze_qubit_spectroscopy(global_data_path, filename,
     plt.title(_qubit_prefix(config) + f"Qubit Spectroscopy:  Gain = {config['qubit_gain_ge']}, "
               f"Sigma (us) = {config['sigma_ge']}, DAC (mA) = {dac}")
 
-    fit = Fit()
-    fit_results = fit.transmission_resonator_spectroscopy(freqs, ydata, plot=show_plot)
-    plt.axvline(fit_results['f'][0], c='red', linestyle='--')
-    print("  Fit results:")
-    pp.pprint(fit_results)
+    if perform_fit:
+        fit = Fit()
+        fit_results = fit.transmission_resonator_spectroscopy(freqs, ydata, plot=show_plot)
+        plt.axvline(fit_results['f'][0], c='red', linestyle='--')
+        print("  Fit results:")
+        pp.pprint(fit_results)
 
     if show_plot:
         plt.legend()
@@ -656,7 +665,8 @@ def analyze_qubit_spectroscopy(global_data_path, filename,
 
 
 def analyze_qubit_spec_temporal_scan(global_data_path, folder_name,
-                                      time_spacing_min=5.0, show_plot=True):
+                                      time_spacing_min=5.0, show_plot=True,
+                                      perform_fit=True):
     """
     Qubit spectroscopy temporal scan (e.g. a folder of overnight qubit
     spectroscopy runs), plotted as a frequency-vs-time colormap.
@@ -684,6 +694,9 @@ def analyze_qubit_spec_temporal_scan(global_data_path, folder_name,
     show_plot : bool
         If True, add a legend and display the figure.
 
+    perform_fit : bool
+        If True (default), fit the data and draw the fit. If False, only the
+        data is plotted - same scaling, labels and stamp, no fit.
     Returns
     -------
     fig : matplotlib Figure
@@ -722,9 +735,13 @@ def analyze_qubit_spec_temporal_scan(global_data_path, folder_name,
                 "can't build a shared colormap frequency axis.")
         amps_list.append(amps)
 
-        fit = Fit()
-        fit_results = fit.transmission_resonator_spectroscopy(freqs, amps, plot=False)
-        freq_values.append(fit_results['f'][0])
+        if perform_fit:
+            fit = Fit()
+            fit_results = fit.transmission_resonator_spectroscopy(freqs, amps,
+                                                                  plot=False)
+            freq_values.append(fit_results['f'][0])
+        else:
+            freq_values.append(np.nan)
         peaks.append(freqs[np.argmax(amps)])
 
     freq_values = np.array(freq_values)
@@ -757,7 +774,8 @@ def analyze_qubit_spec_temporal_scan(global_data_path, folder_name,
 
 def analyze_length_rabi(global_data_path, filename,
                          SS=False, ef=False,
-                         plot_cal=False, show_plot=True):
+                         plot_cal=False, show_plot=True,
+                         perform_fit=True):
     """
     Length (time) Rabi oscillation experiment.
 
@@ -776,6 +794,9 @@ def analyze_length_rabi(global_data_path, filename,
     show_plot : bool
         If True, add a legend and display the figure.
 
+    perform_fit : bool
+        If True (default), fit the data and draw the fit. If False, only the
+        data is plotted - same scaling, labels and stamp, no fit.
     Returns
     -------
     fig : matplotlib Figure
@@ -818,24 +839,25 @@ def analyze_length_rabi(global_data_path, filename,
     plt.xlabel(r"Pulse Length ($\mu s$)")
     plt.title(_qubit_prefix(config) + f"Length Rabi Oscillations (Qubit gain = {config['qubit_gain_ge']:.2f})")
 
-    # Fit with decaying sinusoid
-    fit_results = fitdecaysin(lengths, ydata, showfit=show_plot)
-    print("  fitdecaysin results:")
-    pp.pprint(fit_results)
+    if perform_fit:
+        # Fit with decaying sinusoid
+        fit_results = fitdecaysin(lengths, ydata, showfit=show_plot)
+        print("  fitdecaysin results:")
+        pp.pprint(fit_results)
 
-    peak = lengths[np.argmax(ydata[lengths < 0.07])]
-    print(f"  Pi-pulse length (first peak): {peak:.4f} us")
-    print(f"  Rabi frequency: {fit_results[1]:.4f} MHz")
+        peak = lengths[np.argmax(ydata[lengths < 0.07])]
+        print(f"  Pi-pulse length (first peak): {peak:.4f} us")
+        print(f"  Rabi frequency: {fit_results[1]:.4f} MHz")
 
-    # Plot fit curve
-    x = np.linspace(0, lengths[-1], 1000)
-    y = (fit_results[0]
-         * np.sin(2.0 * np.pi * fit_results[1] * x + fit_results[2] * np.pi / 180.0)
-         * np.exp(-1.0 * (x - lengths[0]) / fit_results[3])
-         + fit_results[4])
-    plt.plot(x, y, label='fit')
-    plt.axvline(peak, linestyle='--', c='red',
-                label=f'pi pulse: {peak:.3f} us')
+        # Plot fit curve
+        x = np.linspace(0, lengths[-1], 1000)
+        y = (fit_results[0]
+             * np.sin(2.0 * np.pi * fit_results[1] * x + fit_results[2] * np.pi / 180.0)
+             * np.exp(-1.0 * (x - lengths[0]) / fit_results[3])
+             + fit_results[4])
+        plt.plot(x, y, label='fit')
+        plt.axvline(peak, linestyle='--', c='red',
+                    label=f'pi pulse: {peak:.3f} us')
     if show_plot:
         plt.legend()
     _stamp_data_path(data)
@@ -849,7 +871,8 @@ def analyze_amplitude_rabi(global_data_path, filename,
                             SS=False, ef=False,
                             gain_cutoff_low=0.0, gain_cutoff_high=1.0,
                             plot_cal=False, show_plot=True,
-                            full_pi_offset=0.0, half_pi_offset=0.0, title_append=""):
+                            full_pi_offset=0.0, half_pi_offset=0.0, title_append="",
+                            perform_fit=True):
     """
     Amplitude (power) Rabi oscillation experiment.
 
@@ -876,6 +899,9 @@ def analyze_amplitude_rabi(global_data_path, filename,
     half_pi_offset : float
         Added to the fitted pi/2-pulse gain (half_pi).
 
+    perform_fit : bool
+        If True (default), fit the data and draw the fit. If False, only the
+        data is plotted - same scaling, labels and stamp, no fit.
     Returns
     -------
     fig : matplotlib Figure
@@ -917,25 +943,31 @@ def analyze_amplitude_rabi(global_data_path, filename,
         plt.ylabel("a.u.")
     plt.xlabel("Pulse Gain (DAC units)")
 
-    # Fit within the specified gain window
-    cutoff = (gains >= gain_cutoff_low) & (gains <= gain_cutoff_high)
-    fit_results = fitdecaysin(gains[cutoff], ydata[cutoff], showfit=True)
-    print("  fitdecaysin results:")
-    pp.pprint(fit_results)
+    if perform_fit:
+        # Fit within the specified gain window
+        cutoff = (gains >= gain_cutoff_low) & (gains <= gain_cutoff_high)
+        fit_results = fitdecaysin(gains[cutoff], ydata[cutoff], showfit=True)
+        print("  fitdecaysin results:")
+        pp.pprint(fit_results)
 
-    peak = 0.5 / fit_results[1]
-    half_pi = peak / 2.0
-    peak += full_pi_offset
-    half_pi += half_pi_offset
-    print(f"  Pi-pulse gain:    {peak:.5f} DAC units")
-    print(f"  Pi/2-pulse gain:  {half_pi:.5f} DAC units")
-    print(f"  Max population:   {ydata[np.argmax(ydata)]:.5f}")
-    print(f"  Phase offset (deg from fit): "
-          f"{(fit_results[2] * 180 / np.pi) / (2 * np.pi * fit_results[1]):.5f}")
+        peak = 0.5 / fit_results[1]
+        half_pi = peak / 2.0
+        peak += full_pi_offset
+        half_pi += half_pi_offset
+        print(f"  Pi-pulse gain:    {peak:.5f} DAC units")
+        print(f"  Pi/2-pulse gain:  {half_pi:.5f} DAC units")
+        print(f"  Max population:   {ydata[np.argmax(ydata)]:.5f}")
+        print(f"  Phase offset (deg from fit): "
+              f"{(fit_results[2] * 180 / np.pi) / (2 * np.pi * fit_results[1]):.5f}")
 
-    plt.axvline(peak, c='red', label=f'pi pulse: {peak:.3f} DAC')
-    plt.axvline(half_pi, c='red', linestyle='--',
-                label=f'pi/2 pulse: {half_pi:.3f} DAC')
+        plt.axvline(peak, c='red', label=f'pi pulse: {peak:.3f} DAC')
+        plt.axvline(half_pi, c='red', linestyle='--',
+                    label=f'pi/2 pulse: {half_pi:.3f} DAC')
+    else:
+        # fitdecaysin draws the trace as well as the fit, so with the fit off
+        # the data has to be plotted here or the axes come out empty.
+        cutoff = (gains >= gain_cutoff_low) & (gains <= gain_cutoff_high)
+        plt.plot(gains[cutoff], ydata[cutoff], marker='o', label='data')
     plt.title(_qubit_prefix(config) + f"Amplitude Rabi Oscillations (Sigma = {config['sigma_ge']:.5f})\n" + title_append)
     if show_plot:
         plt.legend()
@@ -951,7 +983,8 @@ def analyze_repeat_X90_pulse(global_data_path, filenames,
                               gain_cutoff_low=0.0, gain_cutoff_high=1.0,
                               extremum='auto', fit_window=3,
                               plot_cal=False, show_plot=True,
-                              gain_offset=0.0, title_append="", vline = None):
+                              gain_offset=0.0, title_append="", vline = None,
+                              perform_fit=True):
     """
     Repeated-X90 (error amplification) pulse calibration.
 
@@ -997,6 +1030,9 @@ def analyze_repeat_X90_pulse(global_data_path, filenames,
         If given, draw a red dashed vertical line at this gain. Tune it by eye
         to read off where the traces cross.
 
+    perform_fit : bool
+        No effect while the fit is commented out; kept so every analysis
+        function takes the same switch.
     Returns
     -------
     fig : matplotlib Figure
@@ -1223,7 +1259,8 @@ def analyze_repeat_X180_pulse(global_data_path, filenames,
                               gain_cutoff_low=0.0, gain_cutoff_high=1.0,
                               extremum='auto', fit_window=3,
                               plot_cal=False, show_plot=True,
-                              gain_offset=0.0, title_append="", vline = None):
+                              gain_offset=0.0, title_append="", vline = None,
+                              perform_fit=True):
     """
     Repeated-X180 (error amplification) pulse calibration.
 
@@ -1269,6 +1306,9 @@ def analyze_repeat_X180_pulse(global_data_path, filenames,
         If given, draw a red dashed vertical line at this gain. Tune it by eye
         to read off where the traces cross.
 
+    perform_fit : bool
+        No effect while the fit is commented out; kept so every analysis
+        function takes the same switch.
     Returns
     -------
     fig : matplotlib Figure
@@ -1314,7 +1354,7 @@ def analyze_repeat_X180_pulse(global_data_path, filenames,
                 "this experiment.")
 
         N = config.get('N', None)
-        n_pulses = 2 * N + 1 if N is not None else None
+        n_pulses = N  if N is not None else None
 
         if SS:
             if plot_cal:
@@ -1413,7 +1453,8 @@ def analyze_repeat_X180_pulse(global_data_path, filenames,
 
 def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,
                        SS=False, ef=False,
-                       plot_cal=False, show_plot=True):
+                       plot_cal=False, show_plot=True,
+                       perform_fit=True):
     """
     T2 Ramsey fringe experiment.
 
@@ -1434,6 +1475,9 @@ def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,
     show_plot : bool
         If True, add a legend and display the figure.
 
+    perform_fit : bool
+        If True (default), fit the data and draw the fit. If False, only the
+        data is plotted - same scaling, labels and stamp, no fit.
     Returns
     -------
     fig : matplotlib Figure
@@ -1481,31 +1525,33 @@ def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,
               f"\n$\\sigma$ = {config['sigma_ge']:.2f} $\\mu$s"
               f", $\\pi / 2$ Gain = {config['half_pi_gain']}")
 
-    fit = Fit()
-    fit_results = fit.ramsey(x_ns, ydata, plot=show_plot)
-    print("  Ramsey fit results:")
-    pp.pprint(fit_results)
+    if perform_fit:
+        fit = Fit()
+        fit_results = fit.ramsey(x_ns, ydata, plot=show_plot)
+        print("  Ramsey fit results:")
+        pp.pprint(fit_results)
 
-    # Decay envelope
-    T2 = fit_results['T2'][0]
-    offset = fit_results['final_offset'][0] + my_offset
-    amp = fit_results['amp'][0]
-    exp_lower = (amp / 2) * (-np.exp(-x_ns / T2)) + offset
-    exp_upper = (amp / 2) * np.exp(-x_ns / T2) + offset
-    plt.plot(x_ns, exp_lower, label='fit lower bound')
-    plt.plot(x_ns, exp_upper, label='fit upper bound')
-    plt.axhline(offset, color='black', linestyle='--',
-                label=f"offset: {offset:.3f}")
+        # Decay envelope
+        T2 = fit_results['T2'][0]
+        offset = fit_results['final_offset'][0] + my_offset
+        amp = fit_results['amp'][0]
+        exp_lower = (amp / 2) * (-np.exp(-x_ns / T2)) + offset
+        exp_upper = (amp / 2) * np.exp(-x_ns / T2) + offset
+        plt.plot(x_ns, exp_lower, label='fit lower bound')
+        plt.plot(x_ns, exp_upper, label='fit upper bound')
+        plt.axhline(offset, color='black', linestyle='--',
+                    label=f"offset: {offset:.3f}")
     if show_plot:
         plt.legend()
     _stamp_data_path(data)
     if show_plot:
         plt.show()
 
-    # Corrected qubit frequency
-    new_freq_ge = (config['qubit_freq_ge']
-                   - (fit_results['f'][0] * 1e3 - config['ramsey_freq']))
-    print(f"  New Qubit frequency: {new_freq_ge:.6f} MHz")
+    if perform_fit:
+        # Corrected qubit frequency
+        new_freq_ge = (config['qubit_freq_ge']
+                       - (fit_results['f'][0] * 1e3 - config['ramsey_freq']))
+        print(f"  New Qubit frequency: {new_freq_ge:.6f} MHz")
 
     return fig
 
@@ -1513,7 +1559,8 @@ def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,
 def analyze_ramsey_freq_calibration(global_data_path, filenames,
                                      SS=False, ef=False,
                                      plot_each=False, plot_cal=False,
-                                     show_plot=True, title_append=""):
+                                     show_plot=True, title_append="",
+                                     perform_fit=True):
     """
     Ramsey frequency calibration.
 
@@ -1553,6 +1600,9 @@ def analyze_ramsey_freq_calibration(global_data_path, filenames,
     title_append : str
         Extra text appended to the plot title.
 
+    perform_fit : bool
+        Accepted for consistency with the other analysis functions, but
+        must stay True here: the plotted quantity is itself a fit result.
     Returns
     -------
     fig : matplotlib Figure
@@ -1566,6 +1616,13 @@ def analyze_ramsey_freq_calibration(global_data_path, filenames,
         raise TypeError(
             "filenames must be a list, not a single string - wrap it in one: "
             f'["{filenames}"]')
+
+    if not perform_fit:
+        raise ValueError(
+            "perform_fit=False has nothing to plot here - the y axis of this "
+            "calibration is the fitted fringe frequency of each file, not raw "
+            "data. Use analyze_t2_ramsey with perform_fit=False to look at an "
+            "individual fringe.")
 
     applied, measured, stamp_lines = [], [], []
     config = {}
@@ -1667,7 +1724,8 @@ def analyze_ramsey_freq_calibration(global_data_path, filenames,
 
 
 def analyze_t2_spin_echo(global_data_path, filename,
-                          SS=False, plot_cal=False, show_plot=True):
+                          SS=False, plot_cal=False, show_plot=True,
+                          perform_fit=True):
     """
     T2 spin-echo experiment.
 
@@ -1684,6 +1742,9 @@ def analyze_t2_spin_echo(global_data_path, filename,
     show_plot : bool
         If True, add a legend and display the figure.
 
+    perform_fit : bool
+        If True (default), fit the data and draw the fit. If False, only the
+        data is plotted - same scaling, labels and stamp, no fit.
     Returns
     -------
     fig : matplotlib Figure
@@ -1726,10 +1787,11 @@ def analyze_t2_spin_echo(global_data_path, filename,
     if show_plot:
         plt.legend()
 
-    fit = Fit()
-    fit_results = fit.ramsey(delay_times, ydata, plot=show_plot)
-    print("  Spin echo fit results:")
-    pp.pprint(fit_results)
+    if perform_fit:
+        fit = Fit()
+        fit_results = fit.ramsey(delay_times, ydata, plot=show_plot)
+        print("  Spin echo fit results:")
+        pp.pprint(fit_results)
     _stamp_data_path(data)
     if show_plot:
         plt.show()
@@ -1738,7 +1800,8 @@ def analyze_t2_spin_echo(global_data_path, filename,
 
 
 def analyze_t1(global_data_path, filename,
-               SS=False, plot_cal=False, show_plot=True):
+               SS=False, plot_cal=False, show_plot=True,
+               perform_fit=True):
     """
     T1 relaxation experiment.
 
@@ -1755,6 +1818,9 @@ def analyze_t1(global_data_path, filename,
     show_plot : bool
         If True, add a legend and display the figure.
 
+    perform_fit : bool
+        If True (default), fit the data and draw the fit. If False, only the
+        data is plotted - same scaling, labels and stamp, no fit.
     Returns
     -------
     fig : matplotlib Figure
@@ -1799,10 +1865,11 @@ def analyze_t1(global_data_path, filename,
     if show_plot:
         plt.legend()
 
-    fit = Fit()
-    fit_results = fit.T1(x_ns, ydata, plot=show_plot)
-    print("  T1 fit results:")
-    pp.pprint(fit_results)
+    if perform_fit:
+        fit = Fit()
+        fit_results = fit.T1(x_ns, ydata, plot=show_plot)
+        print("  T1 fit results:")
+        pp.pprint(fit_results)
     _stamp_data_path(data)
     if show_plot:
         plt.show()
@@ -1812,7 +1879,8 @@ def analyze_t1(global_data_path, filename,
 
 def analyze_T1_temporal_scan(global_data_path, folder_name,
                               error_bars=True,
-                              time_spacing_min=5.0, show_plot=True):
+                              time_spacing_min=5.0, show_plot=True,
+                              perform_fit=True):
     """
     T1 temporal scan (e.g. a folder of overnight T1 runs).
 
@@ -1837,6 +1905,9 @@ def analyze_T1_temporal_scan(global_data_path, folder_name,
     show_plot : bool
         If True, add a legend and display the figure.
 
+    perform_fit : bool
+        Accepted for consistency with the other analysis functions, but
+        must stay True here: the plotted quantity is itself a fit result.
     Returns
     -------
     fig : matplotlib Figure
@@ -1846,6 +1917,12 @@ def analyze_T1_temporal_scan(global_data_path, folder_name,
     T1_errors : 1D np.array
         Fit standard error on T1 (us) for each file, in the order plotted.
     """
+    if not perform_fit:
+        raise ValueError(
+            "perform_fit=False has nothing to plot here - the y axis of this "
+            "scan is the fitted T1 of each file, not raw data. Use analyze_t1 "
+            "with perform_fit=False to look at an individual trace.")
+
     folder_path = os.path.join(global_data_path, folder_name)
     print(f"Data folder: {folder_path}")
 

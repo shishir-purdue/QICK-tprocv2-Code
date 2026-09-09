@@ -101,7 +101,14 @@ class RamseyProgram(AveragerProgramV2):
 ###################
 
 # Hardcoded for now - the applied Ramsey frequencies (MHz) to step through
-RAMSEY_FREQS = [1, 2, 3, 4, 5]
+RAMSEY_FREQS = [1, 2, 3, 4, 5, 6]
+
+# The delay sweep is sized from the applied frequency rather than fixed:
+# cover N_PERIODS full fringes at TARGET_STEP_NS between points, and refuse
+# to run coarser than MAX_STEP_NS whatever the frequency works out to.
+N_PERIODS = 4
+TARGET_STEP_NS = 5.0
+MAX_STEP_NS = 10.0
 
 # Keep the name we looked the config up with: initialize_configs appends
 # '_mux' to what it is handed, so feeding expt_name back in would grow a
@@ -122,6 +129,26 @@ for rf_i, ramsey_freq in enumerate(RAMSEY_FREQS):
     # folds it into the second pulse's phase while the program is compiled,
     # not when it is acquired.
     config.update([("ramsey_freq", ramsey_freq)])
+
+    # ----- Delay sweep sized from the applied frequency ----- #
+    # One fringe lasts 1/ramsey_freq us for ramsey_freq in MHz, so N_PERIODS
+    # of them fix the upper limit and the point count follows from the target
+    # spacing. initialize_configs has already built wait_time out of the
+    # config's own start/stop, so the sweep object has to be rebuilt here or
+    # the new limits are ignored.
+    start_us = 0.0
+    stop_us = N_PERIODS / ramsey_freq
+    steps = int(np.ceil(stop_us * 1e3 / TARGET_STEP_NS)) + 1
+    step_ns = stop_us * 1e3 / (steps - 1)
+    if step_ns > MAX_STEP_NS:
+        raise ValueError(
+            f"delay resolution came out at {step_ns:.2f} ns, coarser than the "
+            f"{MAX_STEP_NS} ns ceiling")
+
+    config.update([("start", start_us), ("stop", stop_us), ("steps", steps),
+                   ("wait_time", QickSweep1D('waitloop', start_us, stop_us))])
+    print(f"    delay 0 -> {stop_us * 1e3:.0f} ns over {steps} points "
+          f"({step_ns:.2f} ns resolution, {N_PERIODS} periods)")
 
     ramsey=RamseyProgram(soccfg, reps=config['reps'], final_delay=config['relax_delay'], cfg=config)
     py_avg = config['py_avg']

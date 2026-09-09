@@ -1523,7 +1523,7 @@ def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,
     plt.xlabel("Delay Time (ns)")
     plt.title(_qubit_prefix(config) + f"Ramsey Fringe Experiment, (Ramsey frequency = {config['ramsey_freq']:.2f} MHz)"
               f"\n$\\sigma$ = {config['sigma_ge']:.2f} $\\mu$s"
-              f", $\\pi / 2$ Gain = {config['half_pi_gain']}")
+              f", $\\pi / 2$ Gain = {config.get('half_pi_gain_ge', config.get('half_pi_gain', 'n/a'))}")
 
     if perform_fit:
         fit = Fit()
@@ -1559,6 +1559,7 @@ def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,
 def analyze_ramsey_freq_calibration(global_data_path, filenames,
                                      SS=False, ef=False,
                                      plot_each=False, plot_cal=False,
+                                     plot_phase=False,
                                      show_plot=True, title_append="",
                                      perform_fit=True):
     """
@@ -1595,6 +1596,11 @@ def analyze_ramsey_freq_calibration(global_data_path, filenames,
         fringe and its fit can be eyeballed.
     plot_cal : bool
         Passed through to analyze_t2_ramsey when plot_each is True.
+    plot_phase : bool
+        If True, also make a second figure of the fitted Ramsey phase against
+        the applied frequency. The fit reports the phase in radians; it is
+        converted to degrees and 360 subtracted, which puts a phase sitting
+        just short of a full turn onto a small signed offset around zero.
     show_plot : bool
         If True, add a legend and display the figure.
     title_append : str
@@ -1607,10 +1613,14 @@ def analyze_ramsey_freq_calibration(global_data_path, filenames,
     -------
     fig : matplotlib Figure
         Handle to the summary figure.
+    fig_phase : matplotlib Figure or None
+        Handle to the phase figure, or None when plot_phase is False.
     applied : 1D np.array
         Applied Ramsey frequency (MHz) for each file, in the order plotted.
     measured : 1D np.array
         Fitted fringe frequency (MHz) for each file, in the order plotted.
+    phases : 1D np.array
+        Fitted phase (degrees, less 360) for each file, in the order plotted.
     """
     if isinstance(filenames, str):
         raise TypeError(
@@ -1624,7 +1634,7 @@ def analyze_ramsey_freq_calibration(global_data_path, filenames,
             "data. Use analyze_t2_ramsey with perform_fit=False to look at an "
             "individual fringe.")
 
-    applied, measured, stamp_lines = [], [], []
+    applied, measured, phases, stamp_lines = [], [], [], []
     config = {}
 
     for fname in filenames:
@@ -1660,12 +1670,17 @@ def analyze_ramsey_freq_calibration(global_data_path, filenames,
         fit_results = Fit().ramsey(x_ns, ydata, plot=False)
         f_meas = fit_results['f'][0] * 1e3   # GHz -> MHz
         f_app = cfg['ramsey_freq']
+        # The fit reports the phase in radians, near a full turn; degrees
+        # less 360 puts it on a small signed offset about zero.
+        phase_deg = np.degrees(fit_results['phase'][0]) - 360.0
 
         applied.append(f_app)
         measured.append(f_meas)
+        phases.append(phase_deg)
         stamp_lines.append(f"{data}  (applied = {f_app} MHz)")
         print(f"  Applied {f_app} MHz -> measured {f_meas:.4f} MHz "
-              f"(difference {f_meas - f_app:+.4f} MHz)")
+              f"(difference {f_meas - f_app:+.4f} MHz), "
+              f"phase {phase_deg:+.2f} deg")
 
         if plot_each:
             analyze_t2_ramsey(global_data_path, fname, SS=SS, ef=ef,
@@ -1673,9 +1688,11 @@ def analyze_ramsey_freq_calibration(global_data_path, filenames,
 
     applied = np.array(applied, dtype=float)
     measured = np.array(measured, dtype=float)
+    phases = np.array(phases, dtype=float)
 
     order = np.argsort(applied)
     applied, measured = applied[order], measured[order]
+    phases = phases[order]
     stamp_lines = [stamp_lines[i] for i in order]
 
     # Slope is fixed at 1, so the intercept is just the mean difference.
@@ -1720,7 +1737,30 @@ def analyze_ramsey_freq_calibration(global_data_path, filenames,
     if show_plot:
         plt.show()
 
-    return fig, applied, measured
+    # ----- Optional second figure: fitted phase ----- #
+    fig_phase = None
+    if plot_phase:
+        fig_phase, ax_p = plt.subplots(figsize=(12, 6))
+        ax_p.plot(applied, phases, 'o-', color='tab:green', markersize=7,
+                  label='fitted phase')
+        ax_p.axhline(0, color='black', linestyle='--', linewidth=1)
+        ax_p.set_xlabel("Applied Ramsey Frequency (MHz)")
+        ax_p.set_ylabel("Fitted Phase - 360 (degrees)")
+        ax_p.set_title(_qubit_prefix(config) + "Ramsey Fitted Phase"
+                       + chr(10) + title_append)
+
+        print("")
+        print(f"  Mean phase:    {np.mean(phases):+.3f} deg")
+        if len(phases) > 1:
+            print(f"  Phase spread:  {np.std(phases, ddof=1):.3f} deg")
+
+        if show_plot:
+            ax_p.legend()
+        _stamp_data_path(chr(10).join(stamp_lines), fig_phase)
+        if show_plot:
+            plt.show()
+
+    return fig, fig_phase, applied, measured, phases
 
 
 def analyze_t2_spin_echo(global_data_path, filename,

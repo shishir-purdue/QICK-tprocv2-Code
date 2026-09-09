@@ -1531,16 +1531,28 @@ def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,
         print("  Ramsey fit results:")
         pp.pprint(fit_results)
 
-        # Decay envelope
+        # Decay envelope. The fringe does not ride on a constant offset: in
+        # the qualang_tools model the baseline relaxes towards final_offset as
+        # exp(-t/T2), so an envelope drawn about a constant sits wrong exactly
+        # where the fringe is biggest. Recover the baseline by taking the
+        # oscillation back out of the fitted curve - that needs no assumption
+        # about how the fit scales its initial_offset, which is not returned
+        # in the same units as amp. fit_func is only valid on the points it
+        # was fitted on, which is what x_ns is.
         T2 = fit_results['T2'][0]
-        offset = fit_results['final_offset'][0] + my_offset
         amp = fit_results['amp'][0]
-        exp_lower = (amp / 2) * (-np.exp(-x_ns / T2)) + offset
-        exp_upper = (amp / 2) * np.exp(-x_ns / T2) + offset
+        final_offset = fit_results['final_offset'][0]
+        half_amp = (amp / 2) * np.exp(-x_ns / T2)
+        baseline = fit_results['fit_func'](x_ns) - half_amp * np.cos(
+            2 * np.pi * fit_results['f'][0] * x_ns + fit_results['phase'][0])
+        baseline = baseline + my_offset
+
+        exp_lower = baseline - half_amp
+        exp_upper = baseline + half_amp
         plt.plot(x_ns, exp_lower, label='fit lower bound')
         plt.plot(x_ns, exp_upper, label='fit upper bound')
-        plt.axhline(offset, color='black', linestyle='--',
-                    label=f"offset: {offset:.3f}")
+        plt.plot(x_ns, baseline, color='black', linestyle='--',
+                 label=f"offset (-> {final_offset + my_offset:.3f})")
     if show_plot:
         plt.legend()
     _stamp_data_path(data)

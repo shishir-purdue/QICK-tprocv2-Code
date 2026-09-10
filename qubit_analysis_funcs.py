@@ -1775,6 +1775,160 @@ def analyze_ramsey_freq_calibration(global_data_path, filenames,
     return fig, fig_phase, applied, measured, phases
 
 
+def analyze_ramsey_ro_length(global_data_path, folder_name,
+                              SS=False, ef=False,
+                              plot_each=False, plot_cal=False,
+                              show_plot=True, title_append="",
+                              perform_fit=True):
+    """
+    Ramsey fitted phase against readout duration.
+
+    Reads a folder written by 006b_ramsey_ro_length_ge.py - one file per
+    readout length, all at the same Ramsey frequency - fits each fringe and
+    plots the fitted phase against the ro_length that produced it.
+
+    The fit reports the phase in radians sitting just short of a full turn, so
+    it is converted to degrees and 360 subtracted, the same convention
+    analyze_ramsey_freq_calibration uses, which puts it on a small signed
+    offset about zero.
+
+    Parameters
+    ----------
+    global_data_path : str
+        Root directory for all data files.
+    folder_name : str
+        Subfolder holding the scan, e.g.
+        "00000_ramsey_ro_length_ge_Q1_2026-09-10". Every .h5 in it is used.
+    SS : bool
+        True if single-shot normalisation data was collected.
+    ef : bool
+        True if these are e-f Ramsey experiments.
+    plot_each : bool
+        If True, also run analyze_t2_ramsey on every file, so each individual
+        fringe and its fit can be eyeballed.
+    plot_cal : bool
+        Passed through to analyze_t2_ramsey when plot_each is True.
+    show_plot : bool
+        If True, add a legend and display the figure.
+    title_append : str
+        Extra text appended to the plot title.
+    perform_fit : bool
+        Accepted for consistency with the other analysis functions, but must
+        stay True here: the plotted quantity is itself a fit result.
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        Handle to the phase figure.
+    ro_lengths : 1D np.array
+        Readout duration (us) for each file, in the order plotted.
+    phases : 1D np.array
+        Fitted phase (degrees, less 360) for each file, in the order plotted.
+    freqs : 1D np.array
+        Fitted fringe frequency (MHz) for each file, in the order plotted.
+    """
+    if not perform_fit:
+        raise ValueError(
+            "perform_fit=False has nothing to plot here - the y axis of this "
+            "scan is the fitted phase of each file, not raw data. Use "
+            "analyze_t2_ramsey with perform_fit=False to look at an "
+            "individual fringe.")
+
+    folder_path = os.path.join(global_data_path, folder_name)
+    print(f"Data folder: {folder_path}")
+
+    files = sorted(f for f in os.listdir(folder_path) if f.endswith('.h5'))
+    if not files:
+        raise ValueError(f"No .h5 files found in {folder_path}")
+
+    ro_lengths, phases, freqs, stamp_lines = [], [], [], []
+    config = {}
+
+    for fname in files:
+        data = os.path.join(folder_path, fname)
+
+        with SlabFile(data, 'r') as f:
+            delay_times = array(f['delay_times'])[0]
+            delay_times = delay_times - delay_times[0]
+            I = array(f['avgi'])[0]
+            Q = array(f['avgq'])[0]
+            amps = array(f['amps'])[0]
+            cfg = _load_config(f)
+
+            if SS:
+                Ig = array(f['I_g'])[0]
+                Qg = array(f['Q_g'])[0]
+                Ie = array(f['I_e'])[0]
+                Qe = array(f['Q_e'])[0]
+                If_data = array(f['I_f'])[0] if ef else None
+                Qf_data = array(f['Q_f'])[0] if ef else None
+
+        if not config:
+            config = cfg
+
+        ydata = (_normalize_population(I, Q, Ig, Qg, Ie, Qe,
+                                        ef=ef, If=If_data, Qf=Qf_data)
+                 if SS else amps)
+
+        # x in ns puts fit_results['f'] in GHz, as analyze_t2_ramsey assumes.
+        x_ns = delay_times * 1000
+        fit_results = Fit().ramsey(x_ns, ydata, plot=False)
+        phase_deg = np.degrees(fit_results['phase'][0]) - 360.0
+        f_meas = fit_results['f'][0] * 1e3   # GHz -> MHz
+        ro = cfg['ro_length']
+
+        ro_lengths.append(ro)
+        phases.append(phase_deg)
+        freqs.append(f_meas)
+        # Folder is stamped once below, so only the filename goes here -
+        # a full path per file runs off the sides of the figure.
+        stamp_lines.append(f"{fname}  (ro_length = {ro} us)")
+        print(f"  ro_length {ro} us -> phase {phase_deg:+.2f} deg, "
+              f"fringe {f_meas:.4f} MHz")
+
+        if plot_each:
+            analyze_t2_ramsey(folder_path, fname, SS=SS, ef=ef,
+                              plot_cal=plot_cal, show_plot=show_plot)
+
+    ro_lengths = np.array(ro_lengths, dtype=float)
+    phases = np.array(phases, dtype=float)
+    freqs = np.array(freqs, dtype=float)
+
+    order = np.argsort(ro_lengths)
+    ro_lengths, phases, freqs = ro_lengths[order], phases[order], freqs[order]
+    stamp_lines = [stamp_lines[i] for i in order]
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    ax.plot(ro_lengths, phases, 'o-', color='tab:green', markersize=7,
+            label='fitted phase')
+    ax.axhline(0, color='black', linestyle='--', linewidth=1)
+    ax.set_xlabel(r"Readout Duration, ro_length ($\mu s$)")
+    ax.set_ylabel("Fitted Phase - 360 (degrees)")
+    ramsey_freq = config.get('ramsey_freq', None)
+    freq_note = (f" (Ramsey frequency = {ramsey_freq} MHz)"
+                 if ramsey_freq is not None else "")
+    ax.set_title(_qubit_prefix(config) + "Ramsey Phase vs Readout Duration"
+                 + freq_note + chr(10) + title_append)
+
+    print("")
+    print(f"  Files:          {len(files)}")
+    print(f"  ro_length:      {ro_lengths[0]:.3f} to {ro_lengths[-1]:.3f} us")
+    print(f"  Phase span:     {np.max(phases) - np.min(phases):.3f} deg")
+    print(f"  Mean phase:     {np.mean(phases):+.3f} deg")
+    if len(phases) > 1:
+        print(f"  Phase spread:   {np.std(phases, ddof=1):.3f} deg")
+        print(f"  Fringe spread:  {np.std(freqs, ddof=1):.5f} MHz "
+              f"(should be flat - the qubit does not know about ro_length)")
+
+    if show_plot:
+        ax.legend()
+    _stamp_data_path(chr(10).join([folder_path] + stamp_lines), fig)
+    if show_plot:
+        plt.show()
+
+    return fig, ro_lengths, phases, freqs
+
+
 def analyze_t2_spin_echo(global_data_path, filename,
                           SS=False, plot_cal=False, show_plot=True,
                           perform_fit=True):

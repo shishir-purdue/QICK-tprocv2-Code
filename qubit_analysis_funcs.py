@@ -1841,7 +1841,7 @@ def analyze_ramsey_ro_length(global_data_path, folder_name,
     if not files:
         raise ValueError(f"No .h5 files found in {folder_path}")
 
-    ro_lengths, phases, freqs, stamp_lines = [], [], [], []
+    ro_lengths, phases, freqs = [], [], []
     config = {}
 
     for fname in files:
@@ -1880,9 +1880,6 @@ def analyze_ramsey_ro_length(global_data_path, folder_name,
         ro_lengths.append(ro)
         phases.append(phase_deg)
         freqs.append(f_meas)
-        # Folder is stamped once below, so only the filename goes here -
-        # a full path per file runs off the sides of the figure.
-        stamp_lines.append(f"{fname}  (ro_length = {ro} us)")
         print(f"  ro_length {ro} us -> phase {phase_deg:+.2f} deg, "
               f"fringe {f_meas:.4f} MHz")
 
@@ -1896,13 +1893,12 @@ def analyze_ramsey_ro_length(global_data_path, folder_name,
 
     order = np.argsort(ro_lengths)
     ro_lengths, phases, freqs = ro_lengths[order], phases[order], freqs[order]
-    stamp_lines = [stamp_lines[i] for i in order]
 
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.plot(ro_lengths, phases, 'o-', color='tab:green', markersize=7,
             label='fitted phase')
     ax.axhline(0, color='black', linestyle='--', linewidth=1)
-    ax.set_xlabel(r"Readout Duration, ro_length ($\mu s$)")
+    ax.set_xlabel("Readout Pulse Length (us)")
     ax.set_ylabel("Fitted Phase - 360 (degrees)")
     ramsey_freq = config.get('ramsey_freq', None)
     freq_note = (f" (Ramsey frequency = {ramsey_freq} MHz)"
@@ -1922,7 +1918,7 @@ def analyze_ramsey_ro_length(global_data_path, folder_name,
 
     if show_plot:
         ax.legend()
-    _stamp_data_path(chr(10).join([folder_path] + stamp_lines), fig)
+    _stamp_data_path(folder_path, fig)
     if show_plot:
         plt.show()
 

@@ -2353,6 +2353,159 @@ def analyze_single_shot(global_data_path, filename,
     return fig
 
 
+def analyze_readout_fidelity_ro_length(global_data_path, folder_name,
+                                        fidelity_method="method1",
+                                        hist_range=50, bin_num=100,
+                                        plot_each=False,
+                                        show_plot=True, title_append=""):
+    """
+    Readout fidelity against readout duration.
+
+    Reads a folder written by 014b_readout_fidelity_ro_length_ge.py - one
+    single-shot g/e file per readout length - computes the fidelity of each
+    the same way analyze_single_shot does, and plots it against the ro_length
+    that produced it.
+
+    Both fidelity estimates are always computed and returned; fidelity_method
+    only decides which are drawn.
+
+    Parameters
+    ----------
+    global_data_path : str
+        Root directory for all data files.
+    folder_name : str
+        Subfolder holding the scan, e.g.
+        "00000_readout_fidelity_ro_length_ge_Q1_2026-09-16". Every .h5 in it
+        is used.
+    fidelity_method : {"method1", "method2", "both"}
+        Which estimate to plot: "method1" is the centroid-axis projection with
+        a threshold sweep, "method2" the optimal-angle rotation and histogram
+        overlap from plotting_helpers.hist, "both" draws both.
+    hist_range : float
+        Histogram range passed to method 2.
+    bin_num : int
+        Number of bins for method 1.
+    plot_each : bool
+        If True, also run analyze_single_shot on every file, so each IQ blob
+        and its histograms can be eyeballed.
+    show_plot : bool
+        If True, add a legend and display the figure.
+    title_append : str
+        Extra text appended to the plot title.
+
+    Returns
+    -------
+    fig : matplotlib Figure
+        Handle to the fidelity figure.
+    ro_lengths : 1D np.array
+        Readout duration (us) for each file, in the order plotted.
+    fid_projection : 1D np.array
+        Method 1 fidelity for each file, in the order plotted.
+    fid_hist : 1D np.array
+        Method 2 fidelity for each file, in the order plotted.
+    """
+    if fidelity_method not in ("method1", "method2", "both"):
+        raise ValueError(
+            f"fidelity_method must be 'method1', 'method2' or 'both', "
+            f"got {fidelity_method!r}")
+
+    folder_path = os.path.join(global_data_path, folder_name)
+    print(f"Data folder: {folder_path}")
+
+    files = sorted(f for f in os.listdir(folder_path) if f.endswith('.h5'))
+    if not files:
+        raise ValueError(f"No .h5 files found in {folder_path}")
+
+    ro_lengths, fid_projection, fid_hist = [], [], []
+    thresholds, angles = [], []
+    config = {}
+
+    for fname in files:
+        data = os.path.join(folder_path, fname)
+
+        with SlabFile(data, 'r') as f:
+            I_g = array(f['I_g'])[0]
+            Q_g = array(f['Q_g'])[0]
+            I_e = array(f['I_e'])[0]
+            Q_e = array(f['Q_e'])[0]
+            cfg = _load_config(f)
+
+        if not config:
+            config = cfg
+
+        # Same two estimates analyze_single_shot uses, without their plots.
+        fid1, _, _ = _compute_fidelity_by_projection(I_g, Q_g, I_e, Q_e,
+                                                     bin_num=bin_num, plot=False)
+        fid2, threshold, angle = _compute_fidelity_by_hist(I_g, Q_g, I_e, Q_e,
+                                                           plot=False, ran=hist_range)
+        ro = cfg['ro_length']
+
+        ro_lengths.append(ro)
+        fid_projection.append(fid1)
+        fid_hist.append(fid2)
+        thresholds.append(threshold)
+        angles.append(np.degrees(angle))
+        print(f"  ro_length {ro} us -> fidelity {fid1:.4f} (projection), "
+              f"{fid2:.4f} (histogram), threshold {threshold:.4f}, "
+              f"angle {np.degrees(angle):.2f} deg")
+
+        if plot_each:
+            analyze_single_shot(folder_path, fname,
+                                fidelity_method=fidelity_method,
+                                hist_range=hist_range, bin_num=bin_num,
+                                show_plot=show_plot)
+
+    ro_lengths = np.array(ro_lengths, dtype=float)
+    fid_projection = np.array(fid_projection, dtype=float)
+    fid_hist = np.array(fid_hist, dtype=float)
+    thresholds = np.array(thresholds, dtype=float)
+    angles = np.array(angles, dtype=float)
+
+    order = np.argsort(ro_lengths)
+    ro_lengths = ro_lengths[order]
+    fid_projection, fid_hist = fid_projection[order], fid_hist[order]
+    thresholds, angles = thresholds[order], angles[order]
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    if fidelity_method in ("method1", "both"):
+        ax.plot(ro_lengths, fid_projection, 'o-', color='tab:blue',
+                markersize=7, label='projection (method 1)')
+    if fidelity_method in ("method2", "both"):
+        ax.plot(ro_lengths, fid_hist, 's-', color='tab:orange',
+                markersize=7, label='histogram (method 2)')
+    ax.set_xlabel("Readout Pulse Length (us)")
+    ax.set_ylabel("Readout Fidelity")
+    ax.set_title(_qubit_prefix(config) + "Readout Fidelity vs Readout Duration"
+                 + chr(10) + title_append)
+
+    # Which pulse prepared |e>, as on the single-shot plots. Every file in the
+    # scan shares it, so the first file's config is enough.
+    if config.get('half_pi') == 'True':
+        pulse_label, gain_key = "Half-pi pulse gain", 'half_pi_gain_ge'
+    else:
+        pulse_label, gain_key = "Pi pulse gain", 'qubit_gain_ge'
+    pulse_note = (f"{pulse_label}: {config[gain_key]}"
+                  if gain_key in config else None)
+
+    best = fid_projection if fidelity_method == "method1" else fid_hist
+    i_best = int(np.argmax(best))
+    print("")
+    print(f"  Files:            {len(files)}")
+    print(f"  ro_length:        {ro_lengths[0]:.3f} to {ro_lengths[-1]:.3f} us")
+    print(f"  Best fidelity:    {best[i_best]:.4f} at ro_length = "
+          f"{ro_lengths[i_best]} us"
+          f"{'' if fidelity_method == 'method1' else ' (histogram)'}")
+    print(f"  Angle spread:     {angles.max() - angles.min():.2f} deg across the scan")
+
+    if show_plot:
+        ax.legend()
+    _stamp_data_path(folder_path, fig, footnote=pulse_note)
+    if show_plot:
+        plt.show()
+
+    return fig, ro_lengths, fid_projection, fid_hist
+
+
 def analyze_readout_optimization(global_data_path, filename,
                                   ge=True, gf=False, ef=False,
                                   fidelity_method="method1",

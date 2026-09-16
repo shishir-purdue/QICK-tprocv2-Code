@@ -1605,12 +1605,12 @@ def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,
         # in radians; degrees, less 360, then mod 360.
         new_freq_ge = (config['qubit_freq_ge']
                        - (fit_results['f'][0] * 1e3 - config['ramsey_freq']))
-        phase_deg = (np.degrees(fit_results['phase'][0]) - 360.0) % 360.0
+        phase_deg = (np.degrees(fit_results['phase'][0]) - 360.0)
         fig.text(0.5, 0.07,
-                 f"New qubit frequency: {new_freq_ge:.6f} MHz      "
+                 f"Measured qubit frequency: {new_freq_ge:.6f} MHz      "
                  f"Starting phase: {phase_deg:.2f} deg",
                  ha='center', va='bottom', fontsize=9)
-        print(f"  New Qubit frequency: {new_freq_ge:.6f} MHz")
+        print(f"  Measured Qubit frequency: {new_freq_ge:.6f} MHz")
         print(f"  Starting phase:      {phase_deg:.2f} deg")
     if show_plot:
         plt.legend()

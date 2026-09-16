@@ -2292,6 +2292,20 @@ def analyze_single_shot(global_data_path, filename,
     if show_plot:
         plt.legend()
     plt.axis('square')
+
+    # Which qubit pulse prepared |e>, and at what gain, written under the axes
+    # above the data-path stamp. half_pi='True' means two X90 pulses at
+    # half_pi_gain_ge; anything else (including files from before the option
+    # existed) is the single pi pulse at qubit_gain_ge.
+    if config.get('half_pi') == 'True':
+        pulse_label, gain_key = "Half-pi pulse gain", 'half_pi_gain_ge'
+    else:
+        pulse_label, gain_key = "Pi pulse gain", 'qubit_gain_ge'
+    if gain_key in config:
+        fig.text(0.5, 0.07, f"{pulse_label}: {config[gain_key]}",
+                 ha='center', va='bottom', fontsize=9)
+        print(f"  {pulse_label}: {config[gain_key]}")
+
     _stamp_data_path(data)
     if show_plot:
         plt.show()

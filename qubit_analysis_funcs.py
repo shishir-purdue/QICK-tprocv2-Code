@@ -1599,17 +1599,24 @@ def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,
         plt.plot(x_ns, exp_upper, label='fit upper bound')
         plt.plot(x_ns, baseline, color='black', linestyle='--',
                  label=f"offset (-> {final_offset + my_offset:.3f})")
+
+        # Corrected qubit frequency and the fitted starting phase, written
+        # under the axes above the data-path stamp. The fit reports the phase
+        # in radians; degrees, less 360, then mod 360.
+        new_freq_ge = (config['qubit_freq_ge']
+                       - (fit_results['f'][0] * 1e3 - config['ramsey_freq']))
+        phase_deg = (np.degrees(fit_results['phase'][0]) - 360.0) % 360.0
+        fig.text(0.5, 0.07,
+                 f"New qubit frequency: {new_freq_ge:.6f} MHz      "
+                 f"Starting phase: {phase_deg:.2f} deg",
+                 ha='center', va='bottom', fontsize=9)
+        print(f"  New Qubit frequency: {new_freq_ge:.6f} MHz")
+        print(f"  Starting phase:      {phase_deg:.2f} deg")
     if show_plot:
         plt.legend()
     _stamp_data_path(data)
     if show_plot:
         plt.show()
-
-    if perform_fit:
-        # Corrected qubit frequency
-        new_freq_ge = (config['qubit_freq_ge']
-                       - (fit_results['f'][0] * 1e3 - config['ramsey_freq']))
-        print(f"  New Qubit frequency: {new_freq_ge:.6f} MHz")
 
     return fig
 

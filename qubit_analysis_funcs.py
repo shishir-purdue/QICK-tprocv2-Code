@@ -202,11 +202,18 @@ def _qubit_prefix(config):
     return f"Q{qubit_index} - " if qubit_index is not None else ""
 
 
-def _stamp_data_path(data_path, fig=None):
-    """Print the source data path in small text at the bottom of the figure."""
+def _stamp_data_path(data_path, fig=None, footnote=None):
+    """
+    Print the source data path in small text at the bottom of the figure.
+
+    footnote, if given, is written on its own line just above the path - for
+    a short note about how the data was taken, like which pulse prepared it.
+    """
     if fig is None:
         fig = plt.gcf()
     fig.subplots_adjust(bottom=0.22)
+    if footnote:
+        fig.text(0.5, 0.07, footnote, ha='center', va='bottom', fontsize=9)
     fig.text(0.5, 0.02, data_path, ha='center', va='bottom', fontsize=7, color='black')
 
 
@@ -249,7 +256,7 @@ def _compute_fidelity_by_projection(I_g, Q_g, I_e, Q_e,
                                      n_threshold_pts=1000,
                                      plot=True,
                                      title_prefix="",
-                                     data_path=None):
+                                     data_path=None, footnote=None):
     """
     Fidelity estimate — Method 1 (manual IQ projection + threshold sweep).
 
@@ -298,7 +305,7 @@ def _compute_fidelity_by_projection(I_g, Q_g, I_e, Q_e,
     if plot:
         plt.title(f"{title_prefix}Readout Fidelity: {best_fid:.3f}")
         if data_path is not None:
-            _stamp_data_path(data_path)
+            _stamp_data_path(data_path, footnote=footnote)
         plt.show()
 
     print(f"  Method 1 fidelity = {best_fid:.4f}")
@@ -309,7 +316,8 @@ def _compute_fidelity_by_projection(I_g, Q_g, I_e, Q_e,
 
 
 def _compute_fidelity_by_hist(I_g, Q_g, I_e, Q_e,
-                               plot=True, ran=50, data_path=None):
+                               plot=True, ran=50, data_path=None,
+                               footnote=None):
     """
     Fidelity estimate — Method 2 (using the ``hist`` helper from
     plotting_helpers, which performs an optimal-angle rotation).
@@ -333,7 +341,7 @@ def _compute_fidelity_by_hist(I_g, Q_g, I_e, Q_e,
         data=[I_g, Q_g, I_e, Q_e], plot=plot, ran=ran
     )
     if plot and data_path is not None:
-        _stamp_data_path(data_path)
+        _stamp_data_path(data_path, footnote=footnote)
     print(f"  Method 2 fidelity = {fid:.3f}")
     print(f"  threshold = {threshold:.4f},  angle = {angle:.4f}")
     return fid, threshold, angle
@@ -343,7 +351,7 @@ def _compute_fidelity_gf_projection(I_g, Q_g, I_f, Q_f,
                                      bin_num=100,
                                      n_threshold_pts=1000,
                                      plot=True,
-                                     data_path=None):
+                                     data_path=None, footnote=None):
     """
     Fidelity by projection for g-f discrimination.
 
@@ -363,7 +371,7 @@ def _compute_fidelity_gf_projection(I_g, Q_g, I_f, Q_f,
         plt.legend()
         plt.title("Readout g-f")
         if data_path is not None:
-            _stamp_data_path(data_path)
+            _stamp_data_path(data_path, footnote=footnote)
         plt.show()
 
     th_list = np.linspace(min(gstate), max(fstate), n_threshold_pts)
@@ -383,7 +391,7 @@ def _compute_fidelity_ef_projection(I_e, Q_e, I_f, Q_f,
                                      bin_num=100,
                                      n_threshold_pts=1000,
                                      plot=True,
-                                     data_path=None):
+                                     data_path=None, footnote=None):
     """
     Fidelity by projection for e-f discrimination.
 
@@ -403,7 +411,7 @@ def _compute_fidelity_ef_projection(I_e, Q_e, I_f, Q_f,
         plt.legend()
         plt.title("Readout e-f")
         if data_path is not None:
-            _stamp_data_path(data_path)
+            _stamp_data_path(data_path, footnote=footnote)
         plt.show()
 
     th_list = np.linspace(min(estate), max(fstate), n_threshold_pts)
@@ -2301,12 +2309,12 @@ def analyze_single_shot(global_data_path, filename,
         pulse_label, gain_key = "Half-pi pulse gain", 'half_pi_gain_ge'
     else:
         pulse_label, gain_key = "Pi pulse gain", 'qubit_gain_ge'
-    if gain_key in config:
-        fig.text(0.5, 0.07, f"{pulse_label}: {config[gain_key]}",
-                 ha='center', va='bottom', fontsize=9)
-        print(f"  {pulse_label}: {config[gain_key]}")
+    pulse_note = (f"{pulse_label}: {config[gain_key]}"
+                  if gain_key in config else None)
+    if pulse_note:
+        print(f"  {pulse_note}")
 
-    _stamp_data_path(data)
+    _stamp_data_path(data, footnote=pulse_note)
     if show_plot:
         plt.show()
 
@@ -2315,22 +2323,22 @@ def analyze_single_shot(global_data_path, filename,
     if fidelity_method in ("method1", "both"):
         _compute_fidelity_by_projection(I_g, Q_g, I_e, Q_e,
                                          bin_num=bin_num, plot=True,
-                                         data_path=data)
+                                         data_path=data, footnote=pulse_note)
     if fidelity_method in ("method2", "both"):
         _compute_fidelity_by_hist(I_g, Q_g, I_e, Q_e,
                                    plot=True, ran=hist_range,
-                                   data_path=data)
+                                   data_path=data, footnote=pulse_note)
 
     # g-f and e-f fidelity if ef data present
     if ef:
         print("--- g-f fidelity ---")
         _compute_fidelity_gf_projection(I_g, Q_g, I_f, Q_f,
                                          bin_num=bin_num, plot=True,
-                                         data_path=data)
+                                         data_path=data, footnote=pulse_note)
         print("--- e-f fidelity ---")
         _compute_fidelity_ef_projection(I_e, Q_e, I_f, Q_f,
                                          bin_num=bin_num, plot=True,
-                                         data_path=data)
+                                         data_path=data, footnote=pulse_note)
 
     return fig
 

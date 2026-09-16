@@ -134,6 +134,52 @@ def power_to_dac(power, dac_ref, dbm_ref, units='dBm'):
 #  Helper functions
 # =============================================================================
 
+def sequential_filenames(first_filename, num_files):
+    """
+    Expand the first file of a run into the list of consecutive filenames.
+
+    Data files are named by get_next_filename with a zero-padded counter in
+    front, e.g. "00004_repeat_X90_pulse_ge_Q1_2026-09-02.h5". Given that first
+    name and how many files there are (counting the first), this returns the
+    consecutive names with only the counter changed, for handing straight to
+    the analysis functions that take a list.
+
+    Parameters
+    ----------
+    first_filename : str
+        Filename of the first file in the run, counter included.
+    num_files : int
+        Number of files in the run, including the first.
+
+    Returns
+    -------
+    list of str
+        The filenames, counter incremented one at a time; the counter keeps the
+        same zero-padded width as the input.
+
+    Examples
+    --------
+    >>> sequential_filenames("00004_repeat_X90_pulse_ge_Q1_2026-09-02.h5", 3)
+    ['00004_repeat_X90_pulse_ge_Q1_2026-09-02.h5',
+     '00005_repeat_X90_pulse_ge_Q1_2026-09-02.h5',
+     '00006_repeat_X90_pulse_ge_Q1_2026-09-02.h5']
+    """
+    if num_files < 1:
+        raise ValueError(f"num_files must be at least 1, got {num_files}")
+
+    digits = 0
+    while digits < len(first_filename) and first_filename[digits].isdigit():
+        digits += 1
+    if digits == 0:
+        raise ValueError(
+            f"{first_filename!r} does not start with a counter - expected "
+            "something like '00004_<name>.h5'")
+
+    start = int(first_filename[:digits])
+    rest = first_filename[digits:]
+    return [f"{start + i:0{digits}d}{rest}" for i in range(num_files)]
+
+
 def _build_path(global_data_path, filename):
     """Join the global data directory and the experiment filename."""
     return global_data_path + "\\" + filename

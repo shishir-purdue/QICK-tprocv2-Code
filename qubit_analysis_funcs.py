@@ -2311,10 +2311,20 @@ def analyze_single_shot(global_data_path, filename,
         pulse_label, gain_key = "Pi pulse gain", 'qubit_gain_ge'
     pulse_note = (f"{pulse_label}: {config[gain_key]}"
                   if gain_key in config else None)
-    if pulse_note:
-        print(f"  {pulse_note}")
 
-    _stamp_data_path(data, footnote=pulse_note)
+    # Rotation angle and threshold from the histogram method, worked out once
+    # up front so every figure can carry them; method 2 draws the same
+    # numbers below. theta is the rotation that lays the g->e separation
+    # along +I, threshold is in those rotated I units.
+    _, ss_threshold, ss_theta = hist(data=[I_g, Q_g, I_e, Q_e],
+                                     plot=False, ran=hist_range)
+    footnote = "    ".join(
+        ([pulse_note] if pulse_note else [])
+        + [f"threshold: {ss_threshold:.4f}",
+           f"angle: {np.degrees(ss_theta):.2f} deg"])
+    print(f"  {footnote}")
+
+    _stamp_data_path(data, footnote=footnote)
     if show_plot:
         plt.show()
 
@@ -2323,22 +2333,22 @@ def analyze_single_shot(global_data_path, filename,
     if fidelity_method in ("method1", "both"):
         _compute_fidelity_by_projection(I_g, Q_g, I_e, Q_e,
                                          bin_num=bin_num, plot=True,
-                                         data_path=data, footnote=pulse_note)
+                                         data_path=data, footnote=footnote)
     if fidelity_method in ("method2", "both"):
         _compute_fidelity_by_hist(I_g, Q_g, I_e, Q_e,
                                    plot=True, ran=hist_range,
-                                   data_path=data, footnote=pulse_note)
+                                   data_path=data, footnote=footnote)
 
     # g-f and e-f fidelity if ef data present
     if ef:
         print("--- g-f fidelity ---")
         _compute_fidelity_gf_projection(I_g, Q_g, I_f, Q_f,
                                          bin_num=bin_num, plot=True,
-                                         data_path=data, footnote=pulse_note)
+                                         data_path=data, footnote=footnote)
         print("--- e-f fidelity ---")
         _compute_fidelity_ef_projection(I_e, Q_e, I_f, Q_f,
                                          bin_num=bin_num, plot=True,
-                                         data_path=data, footnote=pulse_note)
+                                         data_path=data, footnote=footnote)
 
     return fig
 

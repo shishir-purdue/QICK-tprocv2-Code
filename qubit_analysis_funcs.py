@@ -217,53 +217,6 @@ def _stamp_data_path(data_path, fig=None, footnote=None):
     fig.text(0.5, 0.02, data_path, ha='center', va='bottom', fontsize=7, color='black')
 
 
-def _fit_cosine(x, y, f_guess, fix_f=False):
-    """
-    Fit y = amp * cos(2*pi*f*x + phase) + offset, with no decay term.
-
-    For windows of about one period, where the six-parameter Ramsey model in
-    qualang_tools cannot converge (there is no decay to see and the FFT
-    frequency guess is too coarse). f is seeded from the applied Ramsey
-    frequency and the phase from a coarse grid, so the fit starts close.
-
-    Parameters
-    ----------
-    x : array        Delay times, in the units 1/f_guess is in (ns for GHz).
-    y : array        Signal.
-    f_guess : float  Starting frequency, e.g. ramsey_freq / 1e3 for x in ns.
-    fix_f : bool     If True, hold f at f_guess and fit only amp, phase and
-                     offset. On a one-period window f and phase are strongly
-                     correlated, so fixing f to a value known from elsewhere
-                     gives a much steadier phase.
-
-    Returns
-    -------
-    amp, f, phase, offset : floats
-        amp is positive and phase is in [0, 2*pi), matching the convention
-        of Fit().ramsey so the same degrees-less-360 shift applies.
-    """
-    from scipy.optimize import curve_fit
-
-    def model(x, amp, f, phase, offset):
-        return amp * np.cos(2 * np.pi * f * x + phase) + offset
-
-    offset0 = float(np.mean(y))
-    amp0 = float(np.max(y) - np.min(y)) / 2
-    grid = np.linspace(0, 2 * np.pi, 36, endpoint=False)
-    phase0 = min(grid, key=lambda ph: np.sum((model(x, amp0, f_guess, ph, offset0) - y) ** 2))
-    if fix_f:
-        popt, _ = curve_fit(lambda x, amp, phase, offset: model(x, amp, f_guess, phase, offset),
-                            x, y, p0=[amp0, phase0, offset0])
-        amp, phase, offset = popt
-        f = f_guess
-    else:
-        popt, _ = curve_fit(model, x, y, p0=[amp0, f_guess, phase0, offset0])
-        amp, f, phase, offset = popt
-    if amp < 0:
-        amp, phase = -amp, phase + np.pi
-    return float(amp), float(f), float(phase % (2 * np.pi)), float(offset)
-
-
 def _normalize_population(I, Q, Ig, Qg, Ie, Qe,
                            ef=False, If=None, Qf=None):
     """
@@ -2050,9 +2003,12 @@ def analyze_ramsey_phase_error(global_data_path, folder_name,
     is the phase error per pulse, and its intercept is the plain Ramsey phase
     (N = 0).
 
-    Phases use the same convention as the other Ramsey analyses (degrees, less
-    360) and are unwrapped in order of N, so a trend that crosses the +/-180
-    boundary stays a straight line.
+    Each fringe is fitted with the standard Ramsey model (Fit().ramsey, the
+    same as analyze_t2_ramsey) and the phase taken from that fit. The model
+    needs two or more fringe periods to converge, so the scan should be taken
+    with N_PERIODS >= 2 in 006c. Phases use the same convention as the other
+    Ramsey analyses (degrees, less 360) and are unwrapped in order of N, so a
+    trend that crosses the +/-180 boundary stays a straight line.
 
     Parameters
     ----------
@@ -2091,7 +2047,7 @@ def analyze_ramsey_phase_error(global_data_path, folder_name,
         Fitted, unwrapped phase (degrees, less 360) for each file, in the
         order plotted.
     freqs : 1D np.array
-        The shared fringe frequency (MHz), repeated for each file.
+        Fitted fringe frequency (MHz) for each file, in the order plotted.
     """
     if not perform_fit:
         raise ValueError(
@@ -2107,7 +2063,7 @@ def analyze_ramsey_phase_error(global_data_path, folder_name,
     if not files:
         raise ValueError(f"No .h5 files found in {folder_path}")
 
-    Ns, traces = [], []
+    Ns, phases, freqs, traces = [], [], [], []
     config = {}
 
     for fname in files:
@@ -2136,34 +2092,32 @@ def analyze_ramsey_phase_error(global_data_path, folder_name,
                                         ef=ef, If=If_data, Qf=Qf_data)
                  if SS else amps)
 
-        Ns.append(cfg['N'])
-        traces.append((delay_times * 1000, ydata, cfg['ramsey_freq'] / 1e3))
+        # Standard Ramsey fit, as analyze_t2_ramsey does. x in ns puts
+        # fit_results['f'] in GHz, as elsewhere.
+        x_ns = delay_times * 1000
+        try:
+            fit_results = Fit().ramsey(x_ns, ydata, plot=False)
+        except RuntimeError as e:
+            raise RuntimeError(
+                f"{fname}: the Ramsey fit did not converge ({e}). It needs two "
+                "or more fringe periods in the window - check N_PERIODS in "
+                "006c_ramsey_phase_error_ge.py.") from e
+        phase_deg = np.degrees(fit_results['phase'][0]) - 360.0
+        f_meas = fit_results['f'][0] * 1e3   # GHz -> MHz
+        N = cfg['N']
+
+        Ns.append(N)
+        phases.append(phase_deg)
+        freqs.append(f_meas)
+        # fit_func is only valid on the points it was fitted on, so keep the
+        # curve evaluated there for the composite figure.
+        traces.append((x_ns, ydata, fit_results['fit_func'](x_ns)))
+        print(f"  N = {N} ({2 * N} extra pulses) -> phase {phase_deg:+.2f} deg, "
+              f"fringe {f_meas:.4f} MHz, T2* {fit_results['T2'][0] / 1e3:.2f} us")
 
         if plot_each:
-            # The standard Ramsey fit needs two or more periods, so the
-            # per-file view is the raw fringe only.
             analyze_t2_ramsey(folder_path, fname, SS=SS, ef=ef,
-                              plot_cal=plot_cal, show_plot=show_plot,
-                              perform_fit=False)
-
-    # The window is one fringe period, which the six-parameter Ramsey fit
-    # cannot handle, so each trace gets a plain cosine. On one period the
-    # frequency and phase are strongly correlated, and the identities do not
-    # change the detuning, so the frequency is the same for every N: fit it
-    # freely in a first pass, then hold every file at the shared value and
-    # fit only the phase. x in ns puts f in GHz, as elsewhere.
-    f_free = np.array([_fit_cosine(x, y, fg)[1] for x, y, fg in traces])
-    f_shared = float(np.median(f_free))
-    phases, freqs, fits = [], [], []
-    for (x, y, _), N in zip(traces, Ns):
-        amp, _, phase, offset = _fit_cosine(x, y, f_shared, fix_f=True)
-        phase_deg = np.degrees(phase) - 360.0
-        phases.append(phase_deg)
-        freqs.append(f_shared * 1e3)
-        fits.append((amp, phase, offset))
-        print(f"  N = {N} ({2 * N} extra pulses) -> phase {phase_deg:+.2f} deg")
-    print(f"  Shared fringe frequency: {f_shared * 1e3:.4f} MHz "
-          f"(free fits spanned {f_free.min() * 1e3:.4f} to {f_free.max() * 1e3:.4f})")
+                              plot_cal=plot_cal, show_plot=show_plot)
 
     Ns = np.array(Ns, dtype=int)
     phases = np.array(phases, dtype=float)
@@ -2172,7 +2126,6 @@ def analyze_ramsey_phase_error(global_data_path, folder_name,
     order = np.argsort(Ns)
     Ns, phases, freqs = Ns[order], phases[order], freqs[order]
     traces = [traces[i] for i in order]
-    fits = [fits[i] for i in order]
     n_pulses = 2 * Ns
 
     # Unwrap in order of N so a drift through the +/-180 boundary does not
@@ -2210,10 +2163,13 @@ def analyze_ramsey_phase_error(global_data_path, folder_name,
     print(f"  Phase error per identity (X90, X90_neg): {2 * slope:+.4f} deg")
     print(f"  N = 0 phase (intercept): {intercept:+.3f} deg")
     print(f"  RMS residual from line: {rms:.3f} deg")
+    if len(freqs) > 1:
+        print(f"  Fringe spread:          {np.std(freqs, ddof=1):.5f} MHz "
+              f"(should be flat - the identities do not change the detuning)")
 
     error_note = (f"Phase error per pulse: {slope:+.3f} deg      "
                   f"per identity (X90, X90_neg): {2 * slope:+.3f} deg      "
-                  f"fringe: {f_shared * 1e3:.4f} MHz")
+                  f"fringe: {np.mean(freqs):.4f} MHz")
 
     if show_plot:
         ax.legend()
@@ -2224,12 +2180,10 @@ def analyze_ramsey_phase_error(global_data_path, folder_name,
     # ----- Composite: every fringe on one axes, labelled by its phase ----- #
     fig_curves, ax_c = plt.subplots(figsize=(12, 6))
     colors = plt.cm.viridis(np.linspace(0, 0.9, len(traces)))
-    for (x, y, _), (amp, phase, offset), N, ph_deg, col in zip(traces, fits, Ns, phases, colors):
+    for (x, y, y_fit), N, ph_deg, col in zip(traces, Ns, phases, colors):
         ax_c.plot(x, y, 'o', color=col, markersize=4,
                   label=f"N = {N} ({2 * N} pulses): {ph_deg:+.1f} deg")
-        x_fine = np.linspace(x.min(), x.max(), 400)
-        ax_c.plot(x_fine, amp * np.cos(2 * np.pi * f_shared * x_fine + phase) + offset,
-                  '-', color=col, linewidth=1.2)
+        ax_c.plot(x, y_fit, '-', color=col, linewidth=1.2)
     if SS:
         ax_c.set_ylabel("Qubit Population")
         ax_c.axhline(1, color='black', linestyle='--', linewidth=1)

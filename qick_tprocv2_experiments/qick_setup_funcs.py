@@ -133,27 +133,48 @@ def declare_pulse(expt_func, cfg, ch, usage = 'res', pulse_style = 'const', puls
     '''
     if pulse_name == 'ramsey1':
         expt_func.add_gauss(ch=ch, name="ramp" + suffix, sigma=cfg['sigma' + suffix], length=cfg['sigma' + suffix]*5, even_length=True)
-        expt_func.add_pulse(ch=ch, name=pulse_name, ro_ch=cfg['ro_ch'], 
+        expt_func.add_pulse(ch=ch, name=pulse_name, ro_ch=None, 
                     style="arb", 
                     envelope="ramp" + suffix, 
                     freq=cfg[usage + '_freq' + suffix], 
                     phase=cfg[usage + '_phase'],
-                    gain=cfg['half_pi_gain'], 
+                    gain=cfg['half_pi_gain' + suffix], 
                     )
     elif pulse_name == 'ramsey2':
         expt_func.add_gauss(ch=ch, name="ramp" + suffix, sigma=cfg['sigma' + suffix], length=cfg['sigma' + suffix]*5, even_length=True)
-        expt_func.add_pulse(ch=ch, name=pulse_name, ro_ch=cfg['ro_ch'], 
+        expt_func.add_pulse(ch=ch, name=pulse_name, ro_ch=None, 
                     style="arb", 
                     envelope="ramp" + suffix, 
                     freq=cfg[usage + '_freq' + suffix], 
-                    phase=cfg[usage + '_phase'] + cfg['wait_time']*360*cfg['ramsey_freq'],
-                    gain=cfg['half_pi_gain'], 
+                    phase=cfg[usage + '_phase'] + cfg['wait_time']*360.0*cfg['ramsey_freq'],
+                    gain=cfg['half_pi_gain' + suffix], 
+                    )
+    elif pulse_name == 'X90':
+        expt_func.add_gauss(ch=ch, name="ramp" + suffix, sigma=cfg['sigma' + suffix], length=cfg['sigma' + suffix]*5, even_length=True)
+        expt_func.add_pulse(ch=ch, name=pulse_name, ro_ch=None, 
+                    style="arb", 
+                    envelope="ramp" + suffix, 
+                    freq=cfg[usage + '_freq' + suffix], 
+                    phase=cfg[usage + '_phase'],
+                    gain=cfg['half_pi_gain' + suffix], 
+                    )
+    elif pulse_name == 'X90_neg':
+        # X90 with its phase shifted by 180 deg: rotates about -X, so it undoes an
+        # X90 exactly only if the two pulses really are 180 deg apart. Used by the
+        # Ramsey phase-error amplification experiment.
+        expt_func.add_gauss(ch=ch, name="ramp" + suffix, sigma=cfg['sigma' + suffix], length=cfg['sigma' + suffix]*5, even_length=True)
+        expt_func.add_pulse(ch=ch, name=pulse_name, ro_ch=None, 
+                    style="arb", 
+                    envelope="ramp" + suffix, 
+                    freq=cfg[usage + '_freq' + suffix], 
+                    phase=cfg[usage + '_phase'] - 180,
+                    gain=cfg['half_pi_gain' + suffix], 
                     )
     else:
         if pulse_style == 'gauss': # for a gaussian pulse
             if (ch in fast_gen_chs) or (ch in inter_gen_chs): # fast gen channels or interpolated channels
                 expt_func.add_gauss(ch=ch, name="ramp" + suffix, sigma=cfg['sigma' + suffix], length=cfg['sigma' + suffix]*5, even_length=True)
-                expt_func.add_pulse(ch=ch, name=pulse_name, ro_ch=cfg['ro_ch'], 
+                expt_func.add_pulse(ch=ch, name=pulse_name, ro_ch=None, 
                         style="arb", 
                         envelope="ramp" + suffix, 
                         freq=cfg[usage + '_freq' + suffix], 

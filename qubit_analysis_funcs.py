@@ -2081,7 +2081,10 @@ def analyze_ramsey_phase_error(global_data_path, folder_name,
     Returns
     -------
     fig : matplotlib Figure
-        Handle to the phase figure.
+        Handle to the phase-vs-pulses figure.
+    fig_curves : matplotlib Figure
+        Handle to the composite of every fringe with its fit, one colour per
+        N, each labelled with its fitted phase.
     n_pulses : 1D np.array
         Number of extra pulses (2N) for each file, in the order plotted.
     phases : 1D np.array
@@ -2151,12 +2154,13 @@ def analyze_ramsey_phase_error(global_data_path, folder_name,
     # fit only the phase. x in ns puts f in GHz, as elsewhere.
     f_free = np.array([_fit_cosine(x, y, fg)[1] for x, y, fg in traces])
     f_shared = float(np.median(f_free))
-    phases, freqs = [], []
+    phases, freqs, fits = [], [], []
     for (x, y, _), N in zip(traces, Ns):
-        _, _, phase, _ = _fit_cosine(x, y, f_shared, fix_f=True)
+        amp, _, phase, offset = _fit_cosine(x, y, f_shared, fix_f=True)
         phase_deg = np.degrees(phase) - 360.0
         phases.append(phase_deg)
         freqs.append(f_shared * 1e3)
+        fits.append((amp, phase, offset))
         print(f"  N = {N} ({2 * N} extra pulses) -> phase {phase_deg:+.2f} deg")
     print(f"  Shared fringe frequency: {f_shared * 1e3:.4f} MHz "
           f"(free fits spanned {f_free.min() * 1e3:.4f} to {f_free.max() * 1e3:.4f})")
@@ -2167,6 +2171,8 @@ def analyze_ramsey_phase_error(global_data_path, folder_name,
 
     order = np.argsort(Ns)
     Ns, phases, freqs = Ns[order], phases[order], freqs[order]
+    traces = [traces[i] for i in order]
+    fits = [fits[i] for i in order]
     n_pulses = 2 * Ns
 
     # Unwrap in order of N so a drift through the +/-180 boundary does not
@@ -2205,13 +2211,41 @@ def analyze_ramsey_phase_error(global_data_path, folder_name,
     print(f"  N = 0 phase (intercept): {intercept:+.3f} deg")
     print(f"  RMS residual from line: {rms:.3f} deg")
 
+    error_note = (f"Phase error per pulse: {slope:+.3f} deg      "
+                  f"per identity (X90, X90_neg): {2 * slope:+.3f} deg      "
+                  f"fringe: {f_shared * 1e3:.4f} MHz")
+
     if show_plot:
         ax.legend()
-    _stamp_data_path(folder_path, fig)
+    _stamp_data_path(folder_path, fig, footnote=error_note)
     if show_plot:
         plt.show()
 
-    return fig, n_pulses, phases, freqs
+    # ----- Composite: every fringe on one axes, labelled by its phase ----- #
+    fig_curves, ax_c = plt.subplots(figsize=(12, 6))
+    colors = plt.cm.viridis(np.linspace(0, 0.9, len(traces)))
+    for (x, y, _), (amp, phase, offset), N, ph_deg, col in zip(traces, fits, Ns, phases, colors):
+        ax_c.plot(x, y, 'o', color=col, markersize=4,
+                  label=f"N = {N} ({2 * N} pulses): {ph_deg:+.1f} deg")
+        x_fine = np.linspace(x.min(), x.max(), 400)
+        ax_c.plot(x_fine, amp * np.cos(2 * np.pi * f_shared * x_fine + phase) + offset,
+                  '-', color=col, linewidth=1.2)
+    if SS:
+        ax_c.set_ylabel("Qubit Population")
+        ax_c.axhline(1, color='black', linestyle='--', linewidth=1)
+        ax_c.axhline(0, color='black', linestyle='--', linewidth=1)
+    else:
+        ax_c.set_ylabel("a.u.")
+    ax_c.set_xlabel("Delay Time (ns)")
+    ax_c.set_title(_qubit_prefix(config) + "Ramsey Phase Error Amplification - fringes"
+                   + freq_note + chr(10) + title_append)
+    if show_plot:
+        ax_c.legend()
+    _stamp_data_path(folder_path, fig_curves, footnote=error_note)
+    if show_plot:
+        plt.show()
+
+    return fig, fig_curves, n_pulses, phases, freqs
 
 
 def analyze_t2_spin_echo(global_data_path, filename,

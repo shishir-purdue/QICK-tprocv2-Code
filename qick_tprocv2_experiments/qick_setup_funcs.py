@@ -44,6 +44,25 @@ readout_cfg = system_config['readout_cfg']
 qubit_cfg = system_config['qubit_cfg']
 
 
+def _check_qubit_lists(system_config):
+    '''
+    _check_qubit_lists makes sure every per-qubit list in the hardware, readout
+    and qubit sections has one entry per qubit, so a hand-edited list that lost
+    or gained a line fails here with its name instead of as an IndexError deep
+    inside build_state.
+
+    system_config: the 'config' section of system_config.json
+    '''
+    n = system_config['num_qubits']
+    for section in ('hw_cfg', 'readout_cfg', 'qubit_cfg'):
+        for key, value in system_config[section].items():
+            if isinstance(value, list) and len(value) != n:
+                raise ValueError(
+                    f"system_config.json: {section}.{key} has {len(value)} entries "
+                    f"but num_qubits is {n} - every per-qubit list needs exactly "
+                    f"{n} (qubits are numbered 1..{n})")
+
+
 def _center_frequency(system_config, expt_name, qubit_index):
     '''
     _center_frequency returns the frequency (MHz) a spectroscopy sweep is centred
@@ -84,6 +103,7 @@ def initialize_configs(expt_name, qubit_index=None):
 
     system_config = configs['config']
     expt_cfg = configs['expt_cfg']
+    _check_qubit_lists(system_config)
 
     QUBIT_INDEX = system_config['qubit_index'] if qubit_index is None else qubit_index
     MUX = system_config['MUX']

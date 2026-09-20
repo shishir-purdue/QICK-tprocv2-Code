@@ -50,6 +50,13 @@ config, expt_name = initialize_configs(expt_name)
 print(expt_name + '\n')
 print(config)
 
+# ----- Which qubits to run, and where the data goes ----- #
+# meas_all = 'True' in system_config.json runs every qubit in qubit_list one
+# after another into a numbered folder; otherwise just the configured qubit,
+# into DATA_PATH, as before.
+qubit_list, data_path_all = setup_meas_all(config, expt_name)
+base_expt_name = expt_name
+
 ##################
 # Define Program #
 ##################
@@ -80,136 +87,146 @@ class SingleToneSpectroscopyProgram(AveragerProgramV2):
         readout(self, cfg)
 
 
-if MUX == 'False': # non-MUX program
-    ###################
-    # Run the Program
-    ###################
+for QUBIT_INDEX in qubit_list:
+    # QUBIT_INDEX is the qubit being measured, numbered from 1. With meas_all
+    # off the list holds just the configured qubit and this runs once. The
+    # config is rebuilt for each qubit; it also has to be rebuilt each pass
+    # anyway, because the save block deletes the swept parameter (a QickParam,
+    # which cannot be JSON-serialised).
+    if len(qubit_list) > 1:
+        print(f"\n=== {base_expt_name}: qubit {QUBIT_INDEX} ===")
+    config, expt_name = initialize_configs(base_expt_name, qubit_index=QUBIT_INDEX)
 
-    prog = SingleToneSpectroscopyProgram(soccfg, reps=config['reps'], final_delay=config['relax_delay'], cfg=config)
-    py_avg = config['py_avg']
+    if MUX == 'False': # non-MUX program
+        ###################
+        # Run the Program
+        ###################
 
-    # for live plotting
-    IS_VISDOM = True
-    if IS_VISDOM:
-        expt_I = expt_Q = expt_mags = expt_phases = expt_pop = None
-        viz = visdom.Visdom()
-        assert viz.check_connection(timeout_seconds=5), "Visdom server not connected!"
-        viz.close(win=None) # close previous plots
-        win1 = viz.line( X=np.arange(0, 1), Y=np.arange(0, 1),
+        prog = SingleToneSpectroscopyProgram(soccfg, reps=config['reps'], final_delay=config['relax_delay'], cfg=config)
+        py_avg = config['py_avg']
+
+        # for live plotting
+        IS_VISDOM = True
+        if IS_VISDOM:
+            expt_I = expt_Q = expt_mags = expt_phases = expt_pop = None
+            viz = visdom.Visdom()
+            assert viz.check_connection(timeout_seconds=5), "Visdom server not connected!"
+            viz.close(win=None) # close previous plots
+            win1 = viz.line( X=np.arange(0, 1), Y=np.arange(0, 1),
+                            opts=dict(height=400, width=700, title='Resonator Spectroscopy', showlegend=True, xlabel='expt_pts'))
+
+            for ii in range(py_avg):
+                iq_list = prog.acquire(soc, soft_avgs=1, progress=False, remove_offset = False)
+                freqs = prog.get_pulse_param("res_pulse", "freq", as_array=True)
+
+                iq_list = iq_list[0][0].T
+                # what is the correct shape/index?
+                this_I = (iq_list[0])
+                this_Q = (iq_list[1])
+
+                if expt_I is None: # ii == 0
+                    expt_I, expt_Q = this_I, this_Q
+                else:
+                    expt_I = (expt_I * ii + this_I) / (ii + 1.0)
+                    expt_Q = (expt_Q * ii + this_Q) / (ii + 1.0)
+
+                expt_mags = np.abs(expt_I + 1j * expt_Q)  # magnitude
+                expt_phases = np.angle(expt_I + 1j * expt_Q)  # phase
+
+                viz.line(X = freqs, Y = expt_mags, win=win1, name='I',
                         opts=dict(height=400, width=700, title='Resonator Spectroscopy', showlegend=True, xlabel='expt_pts'))
 
-        for ii in range(py_avg):
-            iq_list = prog.acquire(soc, soft_avgs=1, progress=False, remove_offset = False)
-            freqs = prog.get_pulse_param("res_pulse", "freq", as_array=True)
-
-            iq_list = iq_list[0][0].T
-            # what is the correct shape/index?
-            this_I = (iq_list[0])
-            this_Q = (iq_list[1])
-
-            if expt_I is None: # ii == 0
-                expt_I, expt_Q = this_I, this_Q
-            else:
-                expt_I = (expt_I * ii + this_I) / (ii + 1.0)
-                expt_Q = (expt_Q * ii + this_Q) / (ii + 1.0)
-
-            expt_mags = np.abs(expt_I + 1j * expt_Q)  # magnitude
-            expt_phases = np.angle(expt_I + 1j * expt_Q)  # phase
-
-            viz.line(X = freqs, Y = expt_mags, win=win1, name='I',
-                    opts=dict(height=400, width=700, title='Resonator Spectroscopy', showlegend=True, xlabel='expt_pts'))
-
-        amps = np.abs(expt_I + 1j*expt_Q)
-        phases = np.angle(expt_I + 1j*expt_Q)
+            amps = np.abs(expt_I + 1j*expt_Q)
+            phases = np.angle(expt_I + 1j*expt_Q)
         
-    else:
-        iq_list = prog.acquire(soc, soft_avgs = py_avg, progress=True)
-        freqs = prog.get_pulse_param("res_pulse", "freq", as_array=True)
-        amps = np.abs(iq_list[0][0].dot([1,1j]))
-        phases = np.angle(iq_list[0][0].dot([1,1j]))
-
-    #####################################
-    # ----- Saves data to a file ----- #
-    #####################################
-
-    prefix = str(datetime.date.today())
-    exp_name = expt_name + '_Q' + str(QUBIT_INDEX) + '_' + prefix
-    print('Experiment name: ' + exp_name)
-
-    data_path = DATA_PATH
-
-    fname = get_next_filename(data_path, exp_name, suffix='.h5')
-    print('Current data file: ' + fname)
-
-    with SlabFile(data_path + '\\' + fname, 'a') as f:
-        # 'a': read/write/create
-
-        # - Adds data to the file - #
-        f.append('fpts', freqs)
-        f.append('amps', amps)
-        f.append('phases', phases)
-        if IS_VISDOM:
-            f.append('avgi', expt_I)
-            f.append('avgq', expt_Q)
         else:
-            f.append('avgi', iq_list[0][0].T[0])
-            f.append('avgq', iq_list[0][0].T[1])
+            iq_list = prog.acquire(soc, soft_avgs = py_avg, progress=True)
+            freqs = prog.get_pulse_param("res_pulse", "freq", as_array=True)
+            amps = np.abs(iq_list[0][0].dot([1,1j]))
+            phases = np.angle(iq_list[0][0].dot([1,1j]))
 
-        del config['res_freq_ge'] # cant save QickParam
-        # formats config into file as a single line
-        f.attrs['config'] = json.dumps(config)
-        # f.attrs['fit_result'] = json.dumps(fit_result)
+        #####################################
+        # ----- Saves data to a file ----- #
+        #####################################
 
-    data = data_path + '\\' + fname
+        prefix = str(datetime.date.today())
+        exp_name = expt_name + '_Q' + str(QUBIT_INDEX) + '_' + prefix
+        print('Experiment name: ' + exp_name)
 
-else: # MUX program
-    ###################
-    # Run the Program
-    ###################
+        data_path = data_path_all
 
-    fpts=[config["start"] + ii*config["step"] for ii in range(config["expts"])]
-    fcenter = np.array(config['freqs'])
+        fname = get_next_filename(data_path, exp_name, suffix='.h5')
+        print('Current data file: ' + fname)
 
-    avgi = np.zeros((len(fcenter), len(fpts)))
-    avgq = np.zeros((len(fcenter), len(fpts)))
-    amps = np.zeros((len(fcenter), len(fpts)))
-    for index, f in enumerate(tqdm(fpts)):
-        config["res_freq_ge"] = fcenter + f
-        prog = SingleToneSpectroscopyProgram(soccfg, reps=config["reps"], final_delay=0.5, cfg=config)    
-        iq_list = prog.acquire(soc, soft_avgs = config["py_avg"], progress=False)
-        for i in range(len(fcenter)):
-            avgi[i][index] = iq_list[i][:,0]
-            avgq[i][index] = iq_list[i][:,1]
-            amps[i][index] = np.abs(iq_list[i][:,0]+1j*iq_list[i][:,1])
-    amps = np.array(amps)
-    avgi = np.array(avgi)
-    avgq = np.array(avgq)
+        with SlabFile(data_path + '\\' + fname, 'a') as f:
+            # 'a': read/write/create
 
-    #####################################
-    # ----- Saves data to a file ----- #
-    #####################################
+            # - Adds data to the file - #
+            f.append('fpts', freqs)
+            f.append('amps', amps)
+            f.append('phases', phases)
+            if IS_VISDOM:
+                f.append('avgi', expt_I)
+                f.append('avgq', expt_Q)
+            else:
+                f.append('avgi', iq_list[0][0].T[0])
+                f.append('avgq', iq_list[0][0].T[1])
 
-    prefix = str(datetime.date.today())
-    exp_name = expt_name + '_' + prefix
-    print('Experiment name: ' + exp_name)
+            del config['res_freq_ge'] # cant save QickParam
+            # formats config into file as a single line
+            f.attrs['config'] = json.dumps(config)
+            # f.attrs['fit_result'] = json.dumps(fit_result)
 
-    data_path = DATA_PATH
+        data = data_path + '\\' + fname
 
-    fname = get_next_filename(data_path, exp_name, suffix='.h5')
-    print('Current data file: ' + fname)
+    else: # MUX program
+        ###################
+        # Run the Program
+        ###################
 
-    with SlabFile(data_path + '\\' + fname, 'a') as f:
-        # 'a': read/write/create
+        fpts=[config["start"] + ii*config["step"] for ii in range(config["expts"])]
+        fcenter = np.array(config['freqs'])
 
-        # - Adds data to the file - #
-        f.append('fpts', fpts)
-        f.append('amps', amps)
-        f.append('fcenter', fcenter)
-        f.append('avgi', avgi)
-        f.append('avgq', avgq)
+        avgi = np.zeros((len(fcenter), len(fpts)))
+        avgq = np.zeros((len(fcenter), len(fpts)))
+        amps = np.zeros((len(fcenter), len(fpts)))
+        for index, f in enumerate(tqdm(fpts)):
+            config["res_freq_ge"] = fcenter + f
+            prog = SingleToneSpectroscopyProgram(soccfg, reps=config["reps"], final_delay=0.5, cfg=config)    
+            iq_list = prog.acquire(soc, soft_avgs = config["py_avg"], progress=False)
+            for i in range(len(fcenter)):
+                avgi[i][index] = iq_list[i][:,0]
+                avgq[i][index] = iq_list[i][:,1]
+                amps[i][index] = np.abs(iq_list[i][:,0]+1j*iq_list[i][:,1])
+        amps = np.array(amps)
+        avgi = np.array(avgi)
+        avgq = np.array(avgq)
 
-        del config['res_freq_ge'] # dont need to save this...
-        # formats config into file as a single line
-        f.attrs['config'] = json.dumps(config)
+        #####################################
+        # ----- Saves data to a file ----- #
+        #####################################
 
-    data = data_path + '\\' + fname
+        prefix = str(datetime.date.today())
+        exp_name = expt_name + '_' + prefix
+        print('Experiment name: ' + exp_name)
+
+        data_path = data_path_all
+
+        fname = get_next_filename(data_path, exp_name, suffix='.h5')
+        print('Current data file: ' + fname)
+
+        with SlabFile(data_path + '\\' + fname, 'a') as f:
+            # 'a': read/write/create
+
+            # - Adds data to the file - #
+            f.append('fpts', fpts)
+            f.append('amps', amps)
+            f.append('fcenter', fcenter)
+            f.append('avgi', avgi)
+            f.append('avgq', avgq)
+
+            del config['res_freq_ge'] # dont need to save this...
+            # formats config into file as a single line
+            f.attrs['config'] = json.dumps(config)
+
+        data = data_path + '\\' + fname

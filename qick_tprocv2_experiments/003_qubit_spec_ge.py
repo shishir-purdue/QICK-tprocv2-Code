@@ -59,6 +59,13 @@ config, expt_name = initialize_configs(expt_name)
 print(expt_name + '\n')
 print(config)
 
+# ----- Which qubits to run, and where the data goes ----- #
+# meas_all = 'True' in system_config.json runs every qubit in qubit_list one
+# after another into a numbered folder; otherwise just the configured qubit,
+# into DATA_PATH, as before.
+qubit_list, data_path_all = setup_meas_all(config, expt_name)
+base_expt_name = expt_name
+
 ##################
 # Define Program #
 ##################
@@ -86,129 +93,142 @@ class PulseProbeSpectroscopyProgram(AveragerProgramV2):
 ###################
 # Run the Program #
 ###################
+for QUBIT_INDEX in qubit_list:
+    # QUBIT_INDEX is the qubit being measured, numbered from 1. With meas_all
+    # off the list holds just the configured qubit and this runs once. The
+    # config is rebuilt for each qubit; it also has to be rebuilt each pass
+    # anyway, because the save block deletes the swept parameter (a QickParam,
+    # which cannot be JSON-serialised).
+    if len(qubit_list) > 1:
+        print(f"\n=== {base_expt_name}: qubit {QUBIT_INDEX} ===")
+    config, expt_name = initialize_configs(base_expt_name, qubit_index=QUBIT_INDEX)
+    if SS == 'True':
+        # single-shot calibration configs for this qubit
+        ss_config, _ = initialize_configs("IQ_plot", qubit_index=QUBIT_INDEX)
 
-qspec=PulseProbeSpectroscopyProgram(soccfg, reps=config['reps'], final_delay=config['relax_delay'], cfg=config)
-py_avg = config['py_avg']
+
+    qspec=PulseProbeSpectroscopyProgram(soccfg, reps=config['reps'], final_delay=config['relax_delay'], cfg=config)
+    py_avg = config['py_avg']
  
 
-# for live plotting
-IS_VISDOM = True
-if IS_VISDOM:
-    expt_I = expt_Q = expt_mags = expt_phases = expt_pop = None
-    viz = visdom.Visdom()
-    assert viz.check_connection(timeout_seconds=5), "Visdom server not connected!"
-    viz.close(win=None) # close previous plots
-    win1 = viz.line( X=np.arange(0, 1), Y=np.arange(0, 1),
-        opts=dict(height=400, width=700, title='Qubit Spectroscopy', showlegend=True, xlabel='expt_pts'))
-
-    for ii in range(py_avg):
-        iq_list = qspec.acquire(soc, soft_avgs=1, progress=False)
-        freqs = qspec.get_pulse_param('qubit_pulse', "freq", as_array=True)
-
-        if MUX == 'False':
-            iq_list = iq_list[0][0].T
-            # what is the correct shape/index?
-            this_I = (iq_list[0])
-            this_Q = (iq_list[1])
-        else:
-            this_I = (iq_list[QUBIT_INDEX - 1].T[0])
-            this_Q = (iq_list[QUBIT_INDEX - 1].T[1])
-
-        if expt_I is None: # ii == 0
-            expt_I, expt_Q = this_I, this_Q
-        else:
-            expt_I = (expt_I * ii + this_I) / (ii + 1.0)
-            expt_Q = (expt_Q * ii + this_Q) / (ii + 1.0)
-
-        expt_mags = np.abs(expt_I + 1j * expt_Q)  # magnitude
-        expt_phases = np.angle(expt_I + 1j * expt_Q)  # phase
-
-        viz.line(X = freqs, Y = expt_mags, win=win1, name='I',
-        opts=dict(height=400, width=700, title='Qubit Spectroscopy', showlegend=True, xlabel='expt_pts'))
-
-    amps = np.abs(expt_I + 1j*expt_Q)
-    
-else:
-    iq_list = qspec.acquire(soc, soft_avgs=py_avg, progress=True)
-    freqs = qspec.get_pulse_param('qubit_pulse', "freq", as_array=True)
-    amps = np.abs(iq_list[0][0].dot([1,1j]))
-
-# ### Fit ###
-# fit = Fit()
-# # Choose the suitable fitting function
-# fit_result = fit.transmission_resonator_spectroscopy(freqs, amps)
-
-# # data = fit_result
-
-# fit_result = {
-#         "f": fit_result['f'],
-#         "kc": fit_result['kc'],
-#         "ki": fit_result['ki'],
-#         "k": fit_result['k'],
-#         "offset": fit_result['offset']
-#     }
-
-# pp.pprint(fit_result)
-
-if SS == 'True':
-    print('performing single shot for g-e calibration')
-
-    ssp_g = SingleShotProgram_g(soccfg, reps=1, final_delay=ss_config['relax_delay'], cfg=ss_config)
-    iq_list_g = ssp_g.acquire(soc, soft_avgs=1, progress=True)
-
-    ssp_e = SingleShotProgram_e(soccfg, reps=1, final_delay=ss_config['relax_delay'], cfg=ss_config)
-    iq_list_e = ssp_e.acquire(soc, soft_avgs=1, progress=True)
-
-    if MUX == 'False':
-        I_g = iq_list_g[0][0].T[0]
-        Q_g = iq_list_g[0][0].T[1]
-        I_e = iq_list_e[0][0].T[0]
-        Q_e = iq_list_e[0][0].T[1]
-    else:
-        I_g = iq_list_g[QUBIT_INDEX - 1].T[0]
-        Q_g = iq_list_g[QUBIT_INDEX - 1].T[1]
-        I_e = iq_list_e[QUBIT_INDEX - 1].T[0]
-        Q_e = iq_list_e[QUBIT_INDEX - 1].T[1]
-
-#####################################
-# ----- Saves data to a file ----- #
-#####################################
-
-prefix = str(datetime.date.today())
-exp_name = expt_name + '_Q' + str(QUBIT_INDEX) + '_' + prefix
-print('Experiment name: ' + exp_name)
-
-data_path = DATA_PATH
-
-fname = get_next_filename(data_path, exp_name, suffix='.h5')
-print('Current data file: ' + fname)
-
-with SlabFile(data_path + '\\' + fname, 'a') as f:
-    # 'a': read/write/create
-
-    # - Adds data to the file - #
-    f.append('fpts', freqs)
-    f.append('amps', amps)
+    # for live plotting
+    IS_VISDOM = True
     if IS_VISDOM:
-        f.append('avgi', expt_I)
-        f.append('avgq', expt_Q)
-    else:
-        f.append('avgi', iq_list[0][0].T[0])
-        f.append('avgq', iq_list[0][0].T[1])
+        expt_I = expt_Q = expt_mags = expt_phases = expt_pop = None
+        viz = visdom.Visdom()
+        assert viz.check_connection(timeout_seconds=5), "Visdom server not connected!"
+        viz.close(win=None) # close previous plots
+        win1 = viz.line( X=np.arange(0, 1), Y=np.arange(0, 1),
+            opts=dict(height=400, width=700, title='Qubit Spectroscopy', showlegend=True, xlabel='expt_pts'))
 
-    del config['qubit_freq_ge']  # cant save QickParam
-    # formats config into file as a single line
-    f.attrs['config'] = json.dumps(config) # cant save configs yet with QickParams
-    # f.attrs['fit_result'] = json.dumps(fit_result)
+        for ii in range(py_avg):
+            iq_list = qspec.acquire(soc, soft_avgs=1, progress=False)
+            freqs = qspec.get_pulse_param('qubit_pulse', "freq", as_array=True)
+
+            if MUX == 'False':
+                iq_list = iq_list[0][0].T
+                # what is the correct shape/index?
+                this_I = (iq_list[0])
+                this_Q = (iq_list[1])
+            else:
+                this_I = (iq_list[QUBIT_INDEX - 1].T[0])
+                this_Q = (iq_list[QUBIT_INDEX - 1].T[1])
+
+            if expt_I is None: # ii == 0
+                expt_I, expt_Q = this_I, this_Q
+            else:
+                expt_I = (expt_I * ii + this_I) / (ii + 1.0)
+                expt_Q = (expt_Q * ii + this_Q) / (ii + 1.0)
+
+            expt_mags = np.abs(expt_I + 1j * expt_Q)  # magnitude
+            expt_phases = np.angle(expt_I + 1j * expt_Q)  # phase
+
+            viz.line(X = freqs, Y = expt_mags, win=win1, name='I',
+            opts=dict(height=400, width=700, title='Qubit Spectroscopy', showlegend=True, xlabel='expt_pts'))
+
+        amps = np.abs(expt_I + 1j*expt_Q)
+    
+    else:
+        iq_list = qspec.acquire(soc, soft_avgs=py_avg, progress=True)
+        freqs = qspec.get_pulse_param('qubit_pulse', "freq", as_array=True)
+        amps = np.abs(iq_list[0][0].dot([1,1j]))
+
+    # ### Fit ###
+    # fit = Fit()
+    # # Choose the suitable fitting function
+    # fit_result = fit.transmission_resonator_spectroscopy(freqs, amps)
+
+    # # data = fit_result
+
+    # fit_result = {
+    #         "f": fit_result['f'],
+    #         "kc": fit_result['kc'],
+    #         "ki": fit_result['ki'],
+    #         "k": fit_result['k'],
+    #         "offset": fit_result['offset']
+    #     }
+
+    # pp.pprint(fit_result)
 
     if SS == 'True':
-        # - Adds ss data to the file - #
-        f.append('I_g', I_g)
-        f.append('Q_g', Q_g)
-        f.append('I_e', I_e)
-        f.append('Q_e', Q_e)    
+        print('performing single shot for g-e calibration')
 
+        ssp_g = SingleShotProgram_g(soccfg, reps=1, final_delay=ss_config['relax_delay'], cfg=ss_config)
+        iq_list_g = ssp_g.acquire(soc, soft_avgs=1, progress=True)
+
+        ssp_e = SingleShotProgram_e(soccfg, reps=1, final_delay=ss_config['relax_delay'], cfg=ss_config)
+        iq_list_e = ssp_e.acquire(soc, soft_avgs=1, progress=True)
+
+        if MUX == 'False':
+            I_g = iq_list_g[0][0].T[0]
+            Q_g = iq_list_g[0][0].T[1]
+            I_e = iq_list_e[0][0].T[0]
+            Q_e = iq_list_e[0][0].T[1]
+        else:
+            I_g = iq_list_g[QUBIT_INDEX - 1].T[0]
+            Q_g = iq_list_g[QUBIT_INDEX - 1].T[1]
+            I_e = iq_list_e[QUBIT_INDEX - 1].T[0]
+            Q_e = iq_list_e[QUBIT_INDEX - 1].T[1]
+
+    #####################################
+    # ----- Saves data to a file ----- #
+    #####################################
+
+    prefix = str(datetime.date.today())
+    exp_name = expt_name + '_Q' + str(QUBIT_INDEX) + '_' + prefix
+    print('Experiment name: ' + exp_name)
+
+    data_path = data_path_all
+
+    fname = get_next_filename(data_path, exp_name, suffix='.h5')
+    print('Current data file: ' + fname)
+
+    with SlabFile(data_path + '\\' + fname, 'a') as f:
+        # 'a': read/write/create
+
+        # - Adds data to the file - #
+        f.append('fpts', freqs)
+        f.append('amps', amps)
+        if IS_VISDOM:
+            f.append('avgi', expt_I)
+            f.append('avgq', expt_Q)
+        else:
+            f.append('avgi', iq_list[0][0].T[0])
+            f.append('avgq', iq_list[0][0].T[1])
+
+        del config['qubit_freq_ge']  # cant save QickParam
         # formats config into file as a single line
-        f.attrs['ss_config'] = json.dumps(ss_config)
+        f.attrs['config'] = json.dumps(config) # cant save configs yet with QickParams
+        # f.attrs['fit_result'] = json.dumps(fit_result)
 
-data = data_path + '\\' + fname
+        if SS == 'True':
+            # - Adds ss data to the file - #
+            f.append('I_g', I_g)
+            f.append('Q_g', Q_g)
+            f.append('I_e', I_e)
+            f.append('Q_e', Q_e)    
+
+            # formats config into file as a single line
+            f.attrs['ss_config'] = json.dumps(ss_config)
+
+    data = data_path + '\\' + fname

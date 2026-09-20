@@ -77,16 +77,26 @@ class SingleShotProgram_e(AveragerProgramV2):
         initialize_ro_chs(self, cfg, suffix='_ge')
 
         self.add_loop("shotloop", cfg["steps"]) # number of total shots
-
+        if cfg['half_pi'] == 'True':
+            qubit_pulse = 'X90'
+        else:
+            qubit_pulse = 'qubit_pulse'
         # initialize the qubit generator channel
         declare_gen_ch(self, cfg, cfg['qubit_ch'], usage='qubit', suffix='_ge')
         # initialize qubit pulse
         declare_pulse(self, cfg, cfg['qubit_ch'], usage='qubit', 
-                      pulse_style='gauss', pulse_name='qubit_pulse', suffix='_ge')
+                      pulse_style='gauss', pulse_name=qubit_pulse, suffix='_ge')
 
     def _body(self, cfg):
-        self.pulse(ch=self.cfg["qubit_ch"], name="qubit_pulse", t=0)  #play pulse
-        self.delay_auto(0.01, tag='wait')
+        if cfg['half_pi'] == 'True':
+            qubit_pulse = 'X90'
+        else:
+            qubit_pulse = 'qubit_pulse'
+        self.pulse(ch=self.cfg["qubit_ch"], name=qubit_pulse, t=0)  #play pulse
+        self.delay_auto(0.01)
+        if cfg['half_pi'] == 'True':
+            self.pulse(ch=self.cfg["qubit_ch"], name=qubit_pulse, t=0)  #play pulse
+            self.delay_auto(0.01)
         # readout using proper configurations for MUX and non-MUX
         readout(self, cfg)
 
@@ -94,49 +104,63 @@ class SingleShotProgram_e(AveragerProgramV2):
 # Run the Program
 ###################
 if config['SS_ONLY'] == 'True':
-    ssp_g = SingleShotProgram_g(soccfg, reps=1, final_delay=config['relax_delay'], cfg=config)
-    iq_list_g = ssp_g.acquire(soc, soft_avgs=1, progress=True)
+    # ----- Which qubits to run, and where the data goes ----- #
+    # meas_all = 'True' in system_config.json runs every qubit in qubit_list one
+    # after another into a numbered folder; otherwise just the configured qubit,
+    # into DATA_PATH, as before.
+    qubit_list, data_path_all = setup_meas_all(config, expt_name)
+    base_expt_name = expt_name
 
-    ssp_e = SingleShotProgram_e(soccfg, reps=1, final_delay=config['relax_delay'], cfg=config)
-    iq_list_e = ssp_e.acquire(soc, soft_avgs=1, progress=True)
+    for QUBIT_INDEX in qubit_list:
+        # QUBIT_INDEX is the qubit being measured, numbered from 1. With meas_all
+        # off the list holds just the configured qubit and this runs once.
+        if len(qubit_list) > 1:
+            print(f"\n=== {base_expt_name}: qubit {QUBIT_INDEX} ===")
+        config, expt_name = initialize_configs(base_expt_name, qubit_index=QUBIT_INDEX)
 
-    if MUX == 'False':
-        I_g = iq_list_g[0][0].T[0]
-        Q_g = iq_list_g[0][0].T[1]
-        I_e = iq_list_e[0][0].T[0]
-        Q_e = iq_list_e[0][0].T[1]
-    else:
-        I_g = iq_list_g[QUBIT_INDEX - 1].T[0]
-        Q_g = iq_list_g[QUBIT_INDEX - 1].T[1]
-        I_e = iq_list_e[QUBIT_INDEX - 1].T[0]
-        Q_e = iq_list_e[QUBIT_INDEX - 1].T[1]
+        ssp_g = SingleShotProgram_g(soccfg, reps=1, final_delay=config['relax_delay'], cfg=config)
+        iq_list_g = ssp_g.acquire(soc, soft_avgs=1, progress=True)
+
+        ssp_e = SingleShotProgram_e(soccfg, reps=1, final_delay=config['relax_delay'], cfg=config)
+        iq_list_e = ssp_e.acquire(soc, soft_avgs=1, progress=True)
+
+        if MUX == 'False':
+            I_g = iq_list_g[0][0].T[0]
+            Q_g = iq_list_g[0][0].T[1]
+            I_e = iq_list_e[0][0].T[0]
+            Q_e = iq_list_e[0][0].T[1]
+        else:
+            I_g = iq_list_g[QUBIT_INDEX - 1].T[0]
+            Q_g = iq_list_g[QUBIT_INDEX - 1].T[1]
+            I_e = iq_list_e[QUBIT_INDEX - 1].T[0]
+            Q_e = iq_list_e[QUBIT_INDEX - 1].T[1]
             
 
 
-    #####################################
-    # ----- Saves data to a file ----- #
-    #####################################
+        #####################################
+        # ----- Saves data to a file ----- #
+        #####################################
 
-    prefix = str(datetime.date.today())
-    exp_name = expt_name + '_Q' + str(QUBIT_INDEX) + '_' + prefix
-    print('Experiment name: ' + exp_name)
+        prefix = str(datetime.date.today())
+        exp_name = expt_name + '_Q' + str(QUBIT_INDEX) + '_' + prefix
+        print('Experiment name: ' + exp_name)
 
-    data_path = DATA_PATH
+        data_path = data_path_all
 
-    fname = get_next_filename(data_path, exp_name, suffix='.h5')
-    print('Current data file: ' + fname)
+        fname = get_next_filename(data_path, exp_name, suffix='.h5')
+        print('Current data file: ' + fname)
 
-    with SlabFile(data_path + '\\' + fname, 'a') as f:
-        # 'a': read/write/create
+        with SlabFile(data_path + '\\' + fname, 'a') as f:
+            # 'a': read/write/create
 
-        # - Adds data to the file - #
-        f.append('I_g', I_g)
-        f.append('Q_g', Q_g)
-        f.append('I_e', I_e)
-        f.append('Q_e', Q_e)    
+            # - Adds data to the file - #
+            f.append('I_g', I_g)
+            f.append('Q_g', Q_g)
+            f.append('I_e', I_e)
+            f.append('Q_e', Q_e)    
 
-        # formats config into file as a single line
-        f.attrs['config'] = json.dumps(config)
+            # formats config into file as a single line
+            f.attrs['config'] = json.dumps(config)
 
     
-    data = data_path + '\\' + fname
+        data = data_path + '\\' + fname

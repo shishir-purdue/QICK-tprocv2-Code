@@ -12,6 +12,8 @@ Date: 2025-05-09
 """
 import numpy as np
 import json
+import os
+import datetime
 
 from build_task import *
 from build_state import *
@@ -90,6 +92,40 @@ def initialize_configs(expt_name, qubit_index=None):
                    ('num_qubits', system_config['num_qubits'])])
 
     return config, expt_name
+
+
+def setup_meas_all(config, expt_name):
+    '''
+    setup_meas_all decides which qubits an experiment runs on and where it saves.
+
+    With config['meas_all'] == 'True' the experiment runs on every qubit in
+    config['qubit_list'] (1-based; all qubits if the key is absent), one after
+    another, and every file goes into a fresh numbered subfolder of DATA_PATH
+    named after the experiment. Otherwise it runs on the one configured qubit
+    and saves straight into DATA_PATH, exactly as before.
+
+    config: the configuration dictionary from initialize_configs
+    expt_name: the experiment name, used for the folder
+
+    returns:
+        qubit_list: the qubits to run, in order
+        data_path: the folder the data files go in
+    '''
+    if config.get('meas_all', 'False') != 'True':
+        return [QUBIT_INDEX - 1], DATA_PATH
+
+    qubit_list = list(config.get('qubit_list', range(1, NUM_QUBITS + 1)))
+
+    # One numbered folder per invocation, so repeated runs stay separate. The
+    # number is one past the highest already sitting in DATA_PATH.
+    folder_suffix = expt_name + '_all_' + str(datetime.date.today())
+    existing = [d for d in os.listdir(DATA_PATH)
+                if os.path.isdir(os.path.join(DATA_PATH, d)) and d[:5].isdigit()]
+    next_num = max([int(d[:5]) for d in existing], default=-1) + 1
+    data_path = os.path.join(DATA_PATH, f"{next_num:05d}_{folder_suffix}")
+    os.makedirs(data_path, exist_ok=True)
+    print(f"meas_all: running on qubits {qubit_list}, saving into {data_path}")
+    return qubit_list, data_path
 
 
 def declare_gen_ch(expt_func, cfg, ch, usage = 'res', suffix = ''):

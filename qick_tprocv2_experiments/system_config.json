@@ -46,6 +46,8 @@
       "num_qubits": 7,
       "qubit_index": 1, 
       "SS": "False",
+      "meas_all": "False",
+      "qubit_list": [1, 2, 3, 4, 5, 6, 7],
       "MUX": "False",
       "dac": [
          0.0,

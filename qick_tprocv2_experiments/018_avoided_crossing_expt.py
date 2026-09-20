@@ -358,10 +358,10 @@ def QubitSpectrosocpy():
             I_e = iq_list_e[0][0].T[0]
             Q_e = iq_list_e[0][0].T[1]
         else:
-            I_g = iq_list_g[QUBIT_INDEX].T[0]
-            Q_g = iq_list_g[QUBIT_INDEX].T[1]
-            I_e = iq_list_e[QUBIT_INDEX].T[0]
-            Q_e = iq_list_e[QUBIT_INDEX].T[1]
+            I_g = iq_list_g[QUBIT_INDEX - 1].T[0]
+            Q_g = iq_list_g[QUBIT_INDEX - 1].T[1]
+            I_e = iq_list_e[QUBIT_INDEX - 1].T[0]
+            Q_e = iq_list_e[QUBIT_INDEX - 1].T[1]
 
     #####################################
     # ----- Saves data to a file ----- #
@@ -522,10 +522,10 @@ def T1():
             I_e = iq_list_e[0][0].T[0]
             Q_e = iq_list_e[0][0].T[1]
         else:
-            I_g = iq_list_g[QUBIT_INDEX].T[0]
-            Q_g = iq_list_g[QUBIT_INDEX].T[1]
-            I_e = iq_list_e[QUBIT_INDEX].T[0]
-            Q_e = iq_list_e[QUBIT_INDEX].T[1]
+            I_g = iq_list_g[QUBIT_INDEX - 1].T[0]
+            Q_g = iq_list_g[QUBIT_INDEX - 1].T[1]
+            I_e = iq_list_e[QUBIT_INDEX - 1].T[0]
+            Q_e = iq_list_e[QUBIT_INDEX - 1].T[1]
 
     #####################################
     # ----- Saves data to a file ----- #
@@ -776,8 +776,8 @@ for i, pt in enumerate(flux_array):
         #     config = json.load(f)
 
         # # adjust experiment configuration values
-        # config['expt_cfg'][expt_name]['start'][QUBIT_INDEX] = res_start[qubit][i]
-        # config['expt_cfg'][expt_name]['stop'][QUBIT_INDEX] = res_stop[qubit][i]
+        # config['expt_cfg'][expt_name]['start'][QUBIT_INDEX - 1] = res_start[qubit][i]
+        # config['expt_cfg'][expt_name]['stop'][QUBIT_INDEX - 1] = res_stop[qubit][i]
 
         # with open('system_config.json', 'w') as f:
         #     json.dump(config, f, indent=3)
@@ -803,9 +803,9 @@ for i, pt in enumerate(flux_array):
             config = json.load(f)
 
         # adjust experiment configuration values
-        config['config']['readout_cfg']['res_freq_ge'][QUBIT_INDEX] = res_freq
-        # config['expt_cfg'][expt_name]['start'][QUBIT_INDEX] = qubit_start[qubit][i]
-        # config['expt_cfg'][expt_name]['stop'][QUBIT_INDEX] = qubit_stop[qubit][i]
+        config['config']['readout_cfg']['res_freq_ge'][QUBIT_INDEX - 1] = res_freq
+        # config['expt_cfg'][expt_name]['start'][QUBIT_INDEX - 1] = qubit_start[qubit][i]
+        # config['expt_cfg'][expt_name]['stop'][QUBIT_INDEX - 1] = qubit_stop[qubit][i]
 
         with open('system_config.json', 'w') as f:
             json.dump(config, f, indent=3)

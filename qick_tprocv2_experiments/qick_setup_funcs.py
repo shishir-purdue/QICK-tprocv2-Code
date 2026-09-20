@@ -42,11 +42,14 @@ readout_cfg = system_config['readout_cfg']
 qubit_cfg = system_config['qubit_cfg']
 
 
-def initialize_configs(expt_name):
+def initialize_configs(expt_name, qubit_index=None):
     '''
     initialize_configs initializes the experiment configurations based on if we are doing mux or not.
 
     expt_name: a string name for the experiment
+    qubit_index: which qubit, numbered from 1 as everywhere else in the configs.
+                 Defaults to system_config['qubit_index']; the meas_all loop
+                 in each experiment passes the qubit it is on.
 
     returns:
         config: the full configuration dictionary for this experiment
@@ -59,7 +62,7 @@ def initialize_configs(expt_name):
     system_config = configs['config']
     expt_cfg = configs['expt_cfg']
 
-    QUBIT_INDEX = system_config['qubit_index']
+    QUBIT_INDEX = system_config['qubit_index'] if qubit_index is None else qubit_index
     MUX = system_config['MUX']
     readout_cfg = system_config['readout_cfg']
 
@@ -79,10 +82,13 @@ def initialize_configs(expt_name):
     else: # non-MUX experiments
         q_config = all_qubit_state(system_config)
         config = {**q_config['Q' + str(QUBIT_INDEX)], **exp_cfg}
-        # Record which qubit this is, so the saved h5 config says so and the
-        # analysis can label its plots without parsing the filename.
-        config.update([('qubit_index', QUBIT_INDEX)])
-    
+
+    # Record which qubit this is (1-based, as typed) and how many there are, so
+    # the saved h5 config says so and the analysis can label its plots and
+    # assemble per-qubit lists without parsing filenames.
+    config.update([('qubit_index', QUBIT_INDEX),
+                   ('num_qubits', system_config['num_qubits'])])
+
     return config, expt_name
 
 

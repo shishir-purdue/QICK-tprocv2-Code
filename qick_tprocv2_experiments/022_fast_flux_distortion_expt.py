@@ -136,8 +136,8 @@ def fast_flux_qubit_spec(q_time, ff_length):
                 this_I = (iq_list[0])
                 this_Q = (iq_list[1])
             else:
-                this_I = (iq_list[QUBIT_INDEX].T[0])
-                this_Q = (iq_list[QUBIT_INDEX].T[1])
+                this_I = (iq_list[QUBIT_INDEX - 1].T[0])
+                this_Q = (iq_list[QUBIT_INDEX - 1].T[1])
 
             if expt_I is None: # ii == 0
                 expt_I, expt_Q = this_I, this_Q

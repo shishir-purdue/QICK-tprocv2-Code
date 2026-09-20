@@ -312,8 +312,8 @@ def QubitSpectrosocpy():
                 this_I = (iq_list[0])
                 this_Q = (iq_list[1])
             else:
-                this_I = (iq_list[QUBIT_INDEX].T[0])
-                this_Q = (iq_list[QUBIT_INDEX].T[1])
+                this_I = (iq_list[QUBIT_INDEX - 1].T[0])
+                this_Q = (iq_list[QUBIT_INDEX - 1].T[1])
 
             if expt_I is None: # ii == 0
                 expt_I, expt_Q = this_I, this_Q
@@ -563,7 +563,7 @@ for qubit in range(num_qubits):
     # adjust experiment configuration values
     config['config']['qubit_index'] = QUBIT_INDEX
     if res_spec:
-        config['config']['readout_cfg']['res_freq_ge'][QUBIT_INDEX] = res_freq
+        config['config']['readout_cfg']['res_freq_ge'][QUBIT_INDEX - 1] = res_freq
 
     with open('system_config.json', 'w') as f:
         json.dump(config, f, indent=3)

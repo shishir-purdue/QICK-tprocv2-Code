@@ -88,10 +88,10 @@ for freqs in range(config['freq_steps']):
             I_e = iq_list_e[0][0].T[0]
             Q_e = iq_list_e[0][0].T[1]
         else:
-            I_g = iq_list_g[QUBIT_INDEX].T[0]
-            Q_g = iq_list_g[QUBIT_INDEX].T[1]
-            I_e = iq_list_e[QUBIT_INDEX].T[0]
-            Q_e = iq_list_e[QUBIT_INDEX].T[1]
+            I_g = iq_list_g[QUBIT_INDEX - 1].T[0]
+            Q_g = iq_list_g[QUBIT_INDEX - 1].T[1]
+            I_e = iq_list_e[QUBIT_INDEX - 1].T[0]
+            Q_e = iq_list_e[QUBIT_INDEX - 1].T[1]
     
         I_g_data.append([I_g])
         Q_g_data.append([Q_g])

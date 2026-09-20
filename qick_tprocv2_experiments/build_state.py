@@ -18,12 +18,14 @@ with open('system_config.json', 'r') as f:
 
 NUM_QUBITS = configs['num_qubits']
 
+# Qubit indices are 1-based (Q1..Q7); each helper subtracts one to index
+# the per-qubit lists in system_config.json.
 # Add DAC and ADC Channels
 def add_qubit_channel(system_config, QubitIndex):
     hw_config = copy.deepcopy(system_config['hw_cfg'])
     var = ["qubit_ch", "res_ch", "ro_ch", "qubit_ch_ef"]
     for Index in var:
-        value = hw_config[Index][QubitIndex]
+        value = hw_config[Index][QubitIndex - 1]
         hw_config.update([(Index,value)])
     return hw_config
 
@@ -34,7 +36,7 @@ def add_readout_cfg(system_config, QubitIndex):
            "res_freq_ef", "res_gain_ef",
            "res_phase", "threshold"]
     for Index in var:
-        value = readout_config[Index][QubitIndex]
+        value = readout_config[Index][QubitIndex - 1]
         readout_config.update([(Index,value)])
     return readout_config
 
@@ -46,7 +48,7 @@ def add_qubit_cfg(system_config, QubitIndex):
            "half_pi_gain_ge",
            "sigma_ge", "sigma_ef"]
     for Index in var:
-        value = qubit_config[Index][QubitIndex]
+        value = qubit_config[Index][QubitIndex - 1]
         qubit_config.update([(Index,value)])
     return qubit_config
 
@@ -58,8 +60,10 @@ def qubit_state(system_config, QubitIndex):
     return {**hw_cfg, **readout_cfg, **qubit_cfg}
 
 def all_qubit_state(system_config):
+    # Qubits are numbered 1..NUM_QUBITS everywhere the user sees them; the
+    # subtraction to a Python index happens once, in the add_* helpers above.
     state = {}
-    for QubitIndex in range(NUM_QUBITS):
+    for QubitIndex in range(1, NUM_QUBITS + 1):
         Qi_state = copy.deepcopy(qubit_state(system_config, QubitIndex))
         state.update([("Q"+str(QubitIndex),Qi_state)])
     return state

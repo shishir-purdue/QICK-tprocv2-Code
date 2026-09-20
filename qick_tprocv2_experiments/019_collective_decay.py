@@ -731,8 +731,8 @@ for i, pt in enumerate(flux_array):
             config = json.load(f)
 
         # adjust experiment configuration values
-        config['expt_cfg'][expt_name]['start'][QUBIT_INDEX] = res_start[qubit][i]
-        config['expt_cfg'][expt_name]['stop'][QUBIT_INDEX] = res_stop[qubit][i]
+        config['expt_cfg'][expt_name]['start'][QUBIT_INDEX - 1] = res_start[qubit][i]
+        config['expt_cfg'][expt_name]['stop'][QUBIT_INDEX - 1] = res_stop[qubit][i]
 
         with open('system_config.json', 'w') as f:
             json.dump(config, f, indent=3)
@@ -752,9 +752,9 @@ for i, pt in enumerate(flux_array):
             config = json.load(f)
 
         # adjust experiment configuration values
-        config['config']['readout_cfg']['res_freq_ge'][QUBIT_INDEX] = res_freq
-        config['expt_cfg'][expt_name]['start'][QUBIT_INDEX] = qubit_start[qubit][i]
-        config['expt_cfg'][expt_name]['stop'][QUBIT_INDEX] = qubit_stop[qubit][i]
+        config['config']['readout_cfg']['res_freq_ge'][QUBIT_INDEX - 1] = res_freq
+        config['expt_cfg'][expt_name]['start'][QUBIT_INDEX - 1] = qubit_start[qubit][i]
+        config['expt_cfg'][expt_name]['stop'][QUBIT_INDEX - 1] = qubit_stop[qubit][i]
 
         with open('system_config.json', 'w') as f:
             json.dump(config, f, indent=3)
@@ -774,11 +774,11 @@ for i, pt in enumerate(flux_array):
             config = json.load(f)
 
         # adjust experiment configuration values
-        config['config']['readout_cfg']['res_freq_ge'][QUBIT_INDEX] = 6170.350609588622 ####res_freq
+        config['config']['readout_cfg']['res_freq_ge'][QUBIT_INDEX - 1] = 6170.350609588622 ####res_freq
         if qubit == 0:
-            config['config']['qubit_cfg']['qubit_freq_ge'][QUBIT_INDEX] = 4182.745759963988
+            config['config']['qubit_cfg']['qubit_freq_ge'][QUBIT_INDEX - 1] = 4182.745759963988
         else:
-            config['config']['qubit_cfg']['qubit_freq_ge'][QUBIT_INDEX] = 4202
+            config['config']['qubit_cfg']['qubit_freq_ge'][QUBIT_INDEX - 1] = 4202
 
         with open('system_config.json', 'w') as f:
             json.dump(config, f, indent=3)

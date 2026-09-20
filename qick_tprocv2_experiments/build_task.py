@@ -23,17 +23,18 @@ def add_single_qubit_experiment(expt_cfg, expt_name, QubitIndex):
     # In most of cases, we have single parameter experiments and two parameter experiment.
     # For single parameter experiments, using "start", "stop", and "step" to calculate "expts".
     # For two parameter experiment, we follow the order "length" or "gain" (inner, RAverage) -- "freq" (outer, Python)
+    # QubitIndex is 1-based; the per-qubit lists below are indexed with - 1
     expt_cfg = expt_cfg[expt_name]
 
     # # Simple Single Parameter Experiments
     if "stop" in expt_cfg:
         try:
-            start = expt_cfg["start"][QubitIndex]
+            start = expt_cfg["start"][QubitIndex - 1]
         except TypeError as e:
             start = expt_cfg["start"]
         
         try:
-            stop = expt_cfg["stop"][QubitIndex]
+            stop = expt_cfg["stop"][QubitIndex - 1]
         except TypeError as e:
             stop = expt_cfg["stop"]
 
@@ -44,8 +45,8 @@ def add_single_qubit_experiment(expt_cfg, expt_name, QubitIndex):
         expt_cfg.update([("start",start), ("stop", stop)])
 
     elif "start" in expt_cfg: # for time rabi
-        start = expt_cfg["start"][QubitIndex]
-        expts = expt_cfg['expts'][QubitIndex]
+        start = expt_cfg["start"][QubitIndex - 1]
+        expts = expt_cfg['expts'][QubitIndex - 1]
 
     # Decide what parameter we are changing.
     if expt_name == 'res_spec_ge':
@@ -67,10 +68,10 @@ def add_single_qubit_experiment(expt_cfg, expt_name, QubitIndex):
     elif expt_name == 'power_rabi_ef':
         expt_cfg.update([('qubit_gain_ef', QickSweep1D('gainloop', start, stop))])
     elif expt_name == "Readout_Optimization_ge" or expt_name == "Readout_Optimization_gef": # for readout optimization experiments
-        freq_start = expt_cfg["freq_start"][QubitIndex]
-        freq_step_size = expt_cfg['freq_step_size'][QubitIndex]
-        gain_start = expt_cfg["gain_start"][QubitIndex]
-        gain_step_size = expt_cfg['gain_step_size'][QubitIndex]
+        freq_start = expt_cfg["freq_start"][QubitIndex - 1]
+        freq_step_size = expt_cfg['freq_step_size'][QubitIndex - 1]
+        gain_start = expt_cfg["gain_start"][QubitIndex - 1]
+        gain_step_size = expt_cfg['gain_step_size'][QubitIndex - 1]
         expt_cfg.update([('freq_start', freq_start), ('freq_step_size', freq_step_size),
                          ('gain_start', gain_start), ('gain_step_size', gain_step_size)])
     return expt_cfg

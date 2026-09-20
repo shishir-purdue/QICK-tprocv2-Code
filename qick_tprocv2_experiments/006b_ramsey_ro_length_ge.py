@@ -169,8 +169,8 @@ for ro_i, ro_length in enumerate(RO_LENGTHS):
                 this_I = (iq_list[0])
                 this_Q = (iq_list[1])
             else:
-                this_I = (iq_list[QUBIT_INDEX].T[0])
-                this_Q = (iq_list[QUBIT_INDEX].T[1])
+                this_I = (iq_list[QUBIT_INDEX - 1].T[0])
+                this_Q = (iq_list[QUBIT_INDEX - 1].T[1])
             
             if expt_I is None: # ii == 0
                 expt_I, expt_Q = this_I, this_Q
@@ -223,10 +223,10 @@ for ro_i, ro_length in enumerate(RO_LENGTHS):
             I_e = iq_list_e[0][0].T[0]
             Q_e = iq_list_e[0][0].T[1]
         else:
-            I_g = iq_list_g[QUBIT_INDEX].T[0]
-            Q_g = iq_list_g[QUBIT_INDEX].T[1]
-            I_e = iq_list_e[QUBIT_INDEX].T[0]
-            Q_e = iq_list_e[QUBIT_INDEX].T[1]
+            I_g = iq_list_g[QUBIT_INDEX - 1].T[0]
+            Q_g = iq_list_g[QUBIT_INDEX - 1].T[1]
+            I_e = iq_list_e[QUBIT_INDEX - 1].T[0]
+            Q_e = iq_list_e[QUBIT_INDEX - 1].T[1]
             
 
 

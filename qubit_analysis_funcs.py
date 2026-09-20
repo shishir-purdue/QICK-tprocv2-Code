@@ -649,7 +649,7 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
     amps_db = 20 * np.log10(amps)
 
     # --- Amplitude plot ---
-    fig_amp = plt.figure(figsize=(8, 8))
+    fig_amp = plt.figure(figsize=(8, 12))
     plt.plot(freqs, amps_db if logscale else amps, marker='o', label='data')
     plt.ylabel("dB" if logscale else "a.u.", fontsize=14)
     plt.xlabel("Resonator Frequency (MHz)", fontsize=14)
@@ -714,7 +714,7 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
         plt.show()
 
     # --- Phase plot ---
-    fig_phase = plt.figure(figsize=(8, 8))
+    fig_phase = plt.figure(figsize=(8, 12))
     plt.plot(freqs, np.unwrap(phases), marker='o', label='phase data')
     plt.ylabel("radians", fontsize=14)
     plt.xlabel("Resonator Frequency (MHz)", fontsize=14)
@@ -786,7 +786,7 @@ def analyze_qubit_spectroscopy(global_data_path, filename,
     else:
         ydata = amps
 
-    fig = plt.figure(figsize=(8, 8))
+    fig = plt.figure(figsize=(8, 12))
     plt.plot(freqs, ydata, marker='o', label='data')
     if SS:
         plt.ylabel("Qubit Population", fontsize=14)

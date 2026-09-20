@@ -38,6 +38,8 @@ NUM_QUBITS = system_config['num_qubits']
 QUBIT_INDEX = system_config['qubit_index']
 MUX = system_config['MUX']
 SS = system_config['SS']
+MEAS_ALL = system_config.get('meas_all', 'False')
+QUBIT_LIST = list(system_config.get('qubit_list', range(1, NUM_QUBITS + 1)))
 
 hw_cfg = system_config['hw_cfg']
 readout_cfg = system_config['readout_cfg']
@@ -142,23 +144,26 @@ def setup_meas_all(config, expt_name):
     '''
     setup_meas_all decides which qubits an experiment runs on and where it saves.
 
-    With config['meas_all'] == 'True' the experiment runs on every qubit in
-    config['qubit_list'] (1-based; all qubits if the key is absent), one after
+    With meas_all = 'True' in system_config.json the experiment runs on every
+    qubit in qubit_list (1-based; all qubits if the key is absent), one after
     another, and every file goes into a fresh numbered subfolder of DATA_PATH
     named after the experiment. Otherwise it runs on the one configured qubit
-    and saves straight into DATA_PATH, exactly as before.
+    and saves straight into DATA_PATH, exactly as before. Both keys sit at the
+    top of the 'config' section next to MUX and SS, so they are read from
+    there (MEAS_ALL, QUBIT_LIST), not from the per-qubit config passed in.
 
-    config: the configuration dictionary from initialize_configs
+    config: the configuration dictionary from initialize_configs (unused, kept
+            so the call reads naturally alongside initialize_configs)
     expt_name: the experiment name, used for the folder
 
     returns:
-        qubit_list: the qubits to run, in order
+        qubit_list: the qubits to run, in order (1-based)
         data_path: the folder the data files go in
     '''
-    if config.get('meas_all', 'False') != 'True':
-        return [QUBIT_INDEX - 1], DATA_PATH
+    if MEAS_ALL != 'True':
+        return [QUBIT_INDEX], DATA_PATH
 
-    qubit_list = list(config.get('qubit_list', range(1, NUM_QUBITS + 1)))
+    qubit_list = list(QUBIT_LIST)
 
     # One numbered folder per invocation, so repeated runs stay separate. The
     # number is one past the highest already sitting in DATA_PATH.

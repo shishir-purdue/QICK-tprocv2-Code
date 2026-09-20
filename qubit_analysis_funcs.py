@@ -286,6 +286,10 @@ def _stamp_data_path(data_path, fig=None, footnote=None):
     """
     Print the source data path in small text at the bottom of the figure.
 
+    A single path is written as two lines, the folder above the file (or
+    scan-folder) name, so it fits on a square figure. Anything already
+    containing line breaks is written as given.
+
     footnote, if given, is written on its own line just above the path - for
     a short note about how the data was taken, like which pulse prepared it.
     """
@@ -293,7 +297,11 @@ def _stamp_data_path(data_path, fig=None, footnote=None):
         fig = plt.gcf()
     fig.subplots_adjust(bottom=0.22)
     if footnote:
-        fig.text(0.5, 0.07, footnote, ha='center', va='bottom', fontsize=9)
+        fig.text(0.5, 0.085, footnote, ha='center', va='bottom', fontsize=9)
+    if chr(10) not in data_path:
+        folder, name = os.path.split(data_path.rstrip('/' + os.sep))
+        if folder and name:
+            data_path = folder + chr(10) + name
     fig.text(0.5, 0.02, data_path, ha='center', va='bottom', fontsize=7, color='black')
 
 
@@ -641,10 +649,11 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
     amps_db = 20 * np.log10(amps)
 
     # --- Amplitude plot ---
-    fig_amp = plt.figure(figsize=(12, 6))
+    fig_amp = plt.figure(figsize=(8, 8))
     plt.plot(freqs, amps_db if logscale else amps, marker='o', label='data')
-    plt.ylabel("dB" if logscale else "a.u.")
-    plt.xlabel("Resonator Frequency (MHz)")
+    plt.ylabel("dB" if logscale else "a.u.", fontsize=14)
+    plt.xlabel("Resonator Frequency (MHz)", fontsize=14)
+    plt.tick_params(labelsize=12)
     plt.title(_qubit_prefix(config) + f"Resonator Spectroscopy, Gain = {config['res_gain_ge']}")
 
     if perform_fit and fit_resonator:
@@ -705,10 +714,11 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
         plt.show()
 
     # --- Phase plot ---
-    fig_phase = plt.figure(figsize=(12, 6))
+    fig_phase = plt.figure(figsize=(8, 8))
     plt.plot(freqs, np.unwrap(phases), marker='o', label='phase data')
-    plt.ylabel("radians")
-    plt.xlabel("Resonator Frequency (MHz)")
+    plt.ylabel("radians", fontsize=14)
+    plt.xlabel("Resonator Frequency (MHz)", fontsize=14)
+    plt.tick_params(labelsize=12)
     plt.title(_qubit_prefix(config) + "Resonator Spectroscopy Phase")
     _stamp_data_path(data)
     if show_plot:
@@ -776,14 +786,15 @@ def analyze_qubit_spectroscopy(global_data_path, filename,
     else:
         ydata = amps
 
-    fig = plt.figure(figsize=(12, 6))
+    fig = plt.figure(figsize=(8, 8))
     plt.plot(freqs, ydata, marker='o', label='data')
     if SS:
-        plt.ylabel("Qubit Population")
+        plt.ylabel("Qubit Population", fontsize=14)
         plt.axhline(1, color='black', linestyle='--')
     else:
-        plt.ylabel("a.u.")
-    plt.xlabel("Qubit Frequency (MHz)")
+        plt.ylabel("a.u.", fontsize=14)
+    plt.xlabel("Qubit Frequency (MHz)", fontsize=14)
+    plt.tick_params(labelsize=12)
     plt.title(_qubit_prefix(config) + f"Qubit Spectroscopy:  Gain = {config['qubit_gain_ge']}, "
               f"Sigma (us) = {config['sigma_ge']}, DAC (mA) = {dac}")
 

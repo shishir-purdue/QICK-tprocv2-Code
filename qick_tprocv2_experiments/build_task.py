@@ -19,15 +19,28 @@ from qick.asm_v2 import AveragerProgramV2
 from qick.asm_v2 import QickSpan, QickSweep1D
 
 
-def add_single_qubit_experiment(expt_cfg, expt_name, QubitIndex):
+def add_single_qubit_experiment(expt_cfg, expt_name, QubitIndex, center=None):
     # In most of cases, we have single parameter experiments and two parameter experiment.
     # For single parameter experiments, using "start", "stop", and "step" to calculate "expts".
     # For two parameter experiment, we follow the order "length" or "gain" (inner, RAverage) -- "freq" (outer, Python)
     # QubitIndex is 1-based; the per-qubit lists below are indexed with - 1
     expt_cfg = expt_cfg[expt_name]
 
+    # Range given relative to the qubit's own centre frequency - the same span
+    # for every qubit - instead of absolute start/stop lists per qubit. The
+    # centre comes from initialize_configs; the resolved start/stop are written
+    # back into the block so they end up in the saved config.
+    if "span_below" in expt_cfg or "span_above" in expt_cfg:
+        if center is None:
+            raise ValueError(
+                f"{expt_name} has a relative range (span_below/span_above) but "
+                "no centre frequency was supplied")
+        start = center - expt_cfg.get("span_below", 0)
+        stop = center + expt_cfg.get("span_above", 0)
+        expt_cfg.update([("start", start), ("stop", stop)])
+
     # # Simple Single Parameter Experiments
-    if "stop" in expt_cfg:
+    elif "stop" in expt_cfg:
         try:
             start = expt_cfg["start"][QubitIndex - 1]
         except TypeError as e:
@@ -81,12 +94,12 @@ def add_multi_qubit_experiment(expt_cfg, expt_name, QubitIndex):
     # Build Multi-qubit Experiment Configuration 
     pass
 
-def add_qubit_experiment(expt_cfg, expt_name, Qubit_list):
+def add_qubit_experiment(expt_cfg, expt_name, Qubit_list, center=None):
     # Classify Single Qubit Experiment or Many Qubit Experiment
 
     if isinstance(Qubit_list,int) == True:
         QubitIndex = Qubit_list
-        expt_config = add_single_qubit_experiment(expt_cfg, expt_name, QubitIndex)
+        expt_config = add_single_qubit_experiment(expt_cfg, expt_name, QubitIndex, center=center)
     elif isinstance(Qubit_list,list) == True:
         QubitIndex = Qubit_list
         expt_config = add_multi_qubit_experiment(expt_cfg, expt_name, QubitIndex)

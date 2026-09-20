@@ -44,6 +44,27 @@ readout_cfg = system_config['readout_cfg']
 qubit_cfg = system_config['qubit_cfg']
 
 
+def _center_frequency(system_config, expt_name, qubit_index):
+    '''
+    _center_frequency returns the frequency (MHz) a spectroscopy sweep is centred
+    on for this qubit, or None for experiments whose ranges are absolute.
+
+    system_config: the 'config' section of system_config.json
+    expt_name: the experiment name
+    qubit_index: 1-based qubit number
+    '''
+    centers = {
+        'res_spec_ge':   ('readout_cfg', 'res_freq_ge'),
+        'res_spec_ef':   ('readout_cfg', 'res_freq_ef'),
+        'qubit_spec_ge': ('qubit_cfg',   'qubit_freq_ge'),
+        'qubit_spec_ef': ('qubit_cfg',   'qubit_freq_ef'),
+    }
+    if expt_name not in centers:
+        return None
+    section, key = centers[expt_name]
+    return system_config[section][key][qubit_index - 1]
+
+
 def initialize_configs(expt_name, qubit_index=None):
     '''
     initialize_configs initializes the experiment configurations based on if we are doing mux or not.
@@ -68,8 +89,11 @@ def initialize_configs(expt_name, qubit_index=None):
     MUX = system_config['MUX']
     readout_cfg = system_config['readout_cfg']
 
-    # add the parameters for the specific experiment we want to do
-    exp_cfg = add_qubit_experiment(expt_cfg, expt_name, QUBIT_INDEX)
+    # add the parameters for the specific experiment we want to do. The
+    # spectroscopy experiments give their sweep as a span around the qubit's
+    # own frequency, so hand that centre over.
+    center = _center_frequency(system_config, expt_name, QUBIT_INDEX)
+    exp_cfg = add_qubit_experiment(expt_cfg, expt_name, QUBIT_INDEX, center=center)
 
     if MUX == 'True': # MUX experiments
         if expt_name == 'res_spec_ge' or expt_name == 'res_spec_ef': # special cases since we sweep ro freq

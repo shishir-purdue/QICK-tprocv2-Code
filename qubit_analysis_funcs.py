@@ -50,6 +50,7 @@ import json
 import pprint as pp
 import os
 import datetime
+import functools
 
 from fitting import *
 from qualang_tools.plot import Fit
@@ -200,6 +201,85 @@ def _qubit_prefix(config):
     """
     qubit_index = config.get('qubit_index', None)
     return f"Q{qubit_index} - " if qubit_index is not None else ""
+
+
+# Fit results that belong in system_config.json, collected by
+# _report_config_values so a folder-wide analysis can assemble the per-qubit
+# lists at the end. Entries are (qubit_index, key, value, num_qubits).
+_CONFIG_REPORTS = []
+
+
+def _report_config_values(config, values):
+    """
+    Print fit results as the config entries they belong in, ready to paste.
+
+    Each value is printed as its system_config.json key for this qubit, and
+    remembered so that when a whole meas_all folder is analysed the wrapper
+    can print the assembled 7-element lists afterwards.
+
+    Parameters
+    ----------
+    config : dict
+        The saved config of the file being analysed (for qubit_index).
+    values : dict
+        {config key: fitted value}, e.g. {'qubit_freq_ge': 5069.64}.
+    """
+    qubit_index = config.get('qubit_index', None)
+    tag = f" (Q{qubit_index})" if qubit_index is not None else ""
+    print(f"  --- config values{tag} ---")
+    for key, value in values.items():
+        print(f'  "{key}": {json.dumps(value)},')
+        _CONFIG_REPORTS.append((qubit_index, key, value, config.get('num_qubits', None)))
+
+
+def _print_config_lists():
+    """Assemble what _report_config_values collected into per-qubit lists."""
+    if not _CONFIG_REPORTS:
+        return
+    keys = []
+    for _, key, _, _ in _CONFIG_REPORTS:
+        if key not in keys:
+            keys.append(key)
+    known_n = [n for _, _, _, n in _CONFIG_REPORTS if n is not None]
+    known_q = [q for q, _, _, _ in _CONFIG_REPORTS if q is not None]
+    n_qubits = max(known_n) if known_n else (max(known_q) if known_q else 0)
+    print("")
+    print(f"  --- config lists, Q1..Q{n_qubits} (null = not in this folder) ---")
+    for key in keys:
+        values = [None] * n_qubits
+        for q, k, v, _ in _CONFIG_REPORTS:
+            if k == key and q is not None and 1 <= q <= n_qubits:
+                values[q - 1] = v
+        print(f'  "{key}": {json.dumps(values)},')
+
+
+def _accepts_folder(func):
+    """
+    Let a single-file analysis function take a meas_all folder instead.
+
+    If the name passed as filename is a folder under global_data_path, the
+    function is run on every .h5 in it (sorted, so in qubit order as written),
+    a list of its results is returned, and the config values each run reported
+    are printed as per-qubit lists at the end. A plain filename behaves
+    exactly as before.
+    """
+    @functools.wraps(func)
+    def wrapper(global_data_path, filename, *args, **kwargs):
+        target = _build_path(global_data_path, filename)
+        if not os.path.isdir(target):
+            return func(global_data_path, filename, *args, **kwargs)
+        files = sorted(f for f in os.listdir(target) if f.endswith('.h5'))
+        if not files:
+            raise ValueError(f"No .h5 files found in {target}")
+        print(f"Data folder: {target}  ({len(files)} files)")
+        del _CONFIG_REPORTS[:]
+        results = []
+        for f in files:
+            print("")
+            results.append(func(target, f, *args, **kwargs))
+        _print_config_lists()
+        return results
+    return wrapper
 
 
 def _stamp_data_path(data_path, fig=None, footnote=None):
@@ -462,6 +542,7 @@ def _plot_ge_calibration(Ig, Qg, Ie, Qe, title_prefix=""):
 #  Experiment functions
 # =============================================================================
 
+@_accepts_folder
 def analyze_time_of_flight(global_data_path, filename, show_plot=True):
     """
     Time-of-flight measurement.
@@ -507,6 +588,7 @@ def analyze_time_of_flight(global_data_path, filename, show_plot=True):
     return fig
 
 
+@_accepts_folder
 def analyze_resonator_spectroscopy(global_data_path, filename,
                                     fit_resonator=True, fit_method='circle',
                                     logscale=False, show_plot=True,
@@ -614,6 +696,8 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
         else:
             raise ValueError(f"Unknown fit_method: {fit_method!r} (use 'circle' or 'hanger')")
 
+        _report_config_values(config, {'res_freq_ge': float(f0)})
+
     if show_plot:
         plt.legend()
     _stamp_data_path(data)
@@ -633,6 +717,7 @@ def analyze_resonator_spectroscopy(global_data_path, filename,
     return fig_amp, fig_phase
 
 
+@_accepts_folder
 def analyze_qubit_spectroscopy(global_data_path, filename,
                                 SS=False, ef=False, dac=0.0,
                                 plot_cal=False, show_plot=True,
@@ -708,6 +793,7 @@ def analyze_qubit_spectroscopy(global_data_path, filename,
         plt.axvline(fit_results['f'][0], c='red', linestyle='--')
         print("  Fit results:")
         pp.pprint(fit_results)
+        _report_config_values(config, {'qubit_freq_ge': float(fit_results['f'][0])})
 
     if show_plot:
         plt.legend()
@@ -826,6 +912,7 @@ def analyze_qubit_spec_temporal_scan(global_data_path, folder_name,
     return fig, freq_values, peaks
 
 
+@_accepts_folder
 def analyze_length_rabi(global_data_path, filename,
                          SS=False, ef=False,
                          plot_cal=False, show_plot=True,
@@ -921,6 +1008,7 @@ def analyze_length_rabi(global_data_path, filename,
     return fig
 
 
+@_accepts_folder
 def analyze_amplitude_rabi(global_data_path, filename,
                             SS=False, ef=False,
                             gain_cutoff_low=0.0, gain_cutoff_high=1.0,
@@ -1008,6 +1096,8 @@ def analyze_amplitude_rabi(global_data_path, filename,
         half_pi = peak / 2.0
         peak += full_pi_offset
         half_pi += half_pi_offset
+        _report_config_values(config, {'qubit_gain_ge': float(peak),
+                                       'half_pi_gain_ge': float(half_pi)})
         print(f"  Pi-pulse gain:    {peak:.5f} DAC units")
         print(f"  Pi/2-pulse gain:  {half_pi:.5f} DAC units")
         print(f"  Max population:   {ydata[np.argmax(ydata)]:.5f}")
@@ -1505,6 +1595,7 @@ def analyze_repeat_X180_pulse(global_data_path, filenames,
     return fig
 
 
+@_accepts_folder
 def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,
                        SS=False, ef=False,
                        plot_cal=False, show_plot=True,
@@ -1613,6 +1704,7 @@ def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,
         # in radians; degrees, less 360, then mod 360.
         new_freq_ge = (config['qubit_freq_ge']
                        - (fit_results['f'][0] * 1e3 - config['ramsey_freq']))
+        _report_config_values(config, {'qubit_freq_ge': float(new_freq_ge)})
         phase_deg = (np.degrees(fit_results['phase'][0]) - 360.0)
         fig.text(0.5, 0.07,
                  f"Measured qubit frequency: {new_freq_ge:.6f} MHz      "
@@ -2202,6 +2294,7 @@ def analyze_ramsey_phase_error(global_data_path, folder_name,
     return fig, fig_curves, n_pulses, phases, freqs
 
 
+@_accepts_folder
 def analyze_t2_spin_echo(global_data_path, filename,
                           SS=False, plot_cal=False, show_plot=True,
                           perform_fit=True):
@@ -2278,6 +2371,7 @@ def analyze_t2_spin_echo(global_data_path, filename,
     return fig
 
 
+@_accepts_folder
 def analyze_t1(global_data_path, filename,
                SS=False, plot_cal=False, show_plot=True,
                perform_fit=True):
@@ -2456,6 +2550,7 @@ def analyze_T1_temporal_scan(global_data_path, folder_name,
     return fig, T1_values, T1_errors
 
 
+@_accepts_folder
 def analyze_single_shot(global_data_path, filename,
                          ef=False,
                          fidelity_method="method1",
@@ -2722,6 +2817,7 @@ def analyze_readout_fidelity_ro_length(global_data_path, folder_name,
     return fig, ro_lengths, fid_projection, fid_hist
 
 
+@_accepts_folder
 def analyze_readout_optimization(global_data_path, filename,
                                   ge=True, gf=False, ef=False,
                                   fidelity_method="method1",

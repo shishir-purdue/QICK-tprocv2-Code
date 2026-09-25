@@ -222,23 +222,27 @@ def declare_pulse(expt_func, cfg, ch, usage = 'res', pulse_style = 'const', puls
     returns:
         nothing...
     '''
-    if pulse_name == 'ramsey1':
+    if pulse_name in ('ramsey1', 'ramsey2'):
+        # The two pi/2 pulses of a Ramsey sequence. 'detuned_pulse' in the
+        # config picks how the Ramsey frequency is applied:
+        #   'True'  - both pulses are driven at qubit_freq + ramsey_freq with the
+        #             same phase, so the fringes come from a real detuning.
+        #   'False' - both pulses at qubit_freq, and ramsey2's phase advances
+        #             with wait_time (a virtual detuning). This is the default,
+        #             so configs without the key behave as before.
+        freq = cfg[usage + '_freq' + suffix]
+        phase = cfg[usage + '_phase']
+        if cfg.get('detuned_pulse', 'False') == 'True':
+            freq = freq + cfg['ramsey_freq']
+        elif pulse_name == 'ramsey2':
+            phase = phase + cfg['wait_time']*360.0*cfg['ramsey_freq']
         expt_func.add_gauss(ch=ch, name="ramp" + suffix, sigma=cfg['sigma' + suffix], length=cfg['sigma' + suffix]*5, even_length=True)
-        expt_func.add_pulse(ch=ch, name=pulse_name, ro_ch=None, 
-                    style="arb", 
-                    envelope="ramp" + suffix, 
-                    freq=cfg[usage + '_freq' + suffix], 
-                    phase=cfg[usage + '_phase'],
-                    gain=cfg['half_pi_gain' + suffix], 
-                    )
-    elif pulse_name == 'ramsey2':
-        expt_func.add_gauss(ch=ch, name="ramp" + suffix, sigma=cfg['sigma' + suffix], length=cfg['sigma' + suffix]*5, even_length=True)
-        expt_func.add_pulse(ch=ch, name=pulse_name, ro_ch=None, 
-                    style="arb", 
-                    envelope="ramp" + suffix, 
-                    freq=cfg[usage + '_freq' + suffix], 
-                    phase=cfg[usage + '_phase'] + cfg['wait_time']*360.0*cfg['ramsey_freq'],
-                    gain=cfg['half_pi_gain' + suffix], 
+        expt_func.add_pulse(ch=ch, name=pulse_name, ro_ch=None,
+                    style="arb",
+                    envelope="ramp" + suffix,
+                    freq=freq,
+                    phase=phase,
+                    gain=cfg['half_pi_gain' + suffix],
                     )
     elif pulse_name == 'X90':
         expt_func.add_gauss(ch=ch, name="ramp" + suffix, sigma=cfg['sigma' + suffix], length=cfg['sigma' + suffix]*5, even_length=True)

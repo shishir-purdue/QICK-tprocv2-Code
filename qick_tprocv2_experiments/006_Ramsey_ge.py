@@ -82,17 +82,18 @@ class RamseyProgram(AveragerProgramV2):
         # initialize qubit pulse
         
         declare_pulse(self, cfg, cfg['qubit_ch'], usage='qubit', 
-                      pulse_style='gauss', pulse_name='ramsey1', suffix='_ge') 
-    
-        declare_pulse(self, cfg, cfg['qubit_ch'], usage='qubit', 
-                      pulse_style='gauss', pulse_name='ramsey2', suffix='_ge') 
-        
-    
+                      pulse_style='gauss', pulse_name='ramsey1', suffix='_ge')
+        # detuned vs. phase-advanced ramsey2 is chosen inside declare_pulse
+        # from cfg['detuned_pulse']
+        declare_pulse(self, cfg, cfg['qubit_ch'], usage='qubit',
+                      pulse_style='gauss', pulse_name='ramsey2', suffix='_ge')
+
+
     def _body(self, cfg):
         self.pulse(ch=self.cfg["qubit_ch"], name="ramsey1", t=0)  #play probe pulse
-        
+
         self.delay_auto(cfg['wait_time'], tag='wait') # wait_time after last pulse
-        
+
         self.pulse(ch=self.cfg["qubit_ch"], name="ramsey2", t=0)  #play pulse
         self.delay_auto(0.025) # wait_time after last pulse
         

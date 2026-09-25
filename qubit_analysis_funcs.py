@@ -1677,7 +1677,8 @@ def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,
     else:
         plt.ylabel("a.u.")
     plt.xlabel("Delay Time (ns)")
-    plt.title(_qubit_prefix(config) + f"Ramsey Fringe Experiment, (Ramsey frequency = {config['ramsey_freq']:.2f} MHz)"
+    detuned = config.get('detuned_pulse', 'False') == 'True'
+    plt.title(_qubit_prefix(config) + f"Ramsey Fringe Experiment, (Ramsey frequency = {config['ramsey_freq']:.2f} MHz{', detuned drive' if detuned else ''})"
               f"\n$\\sigma$ = {config['sigma_ge']:.2f} $\\mu$s"
               f", $\\pi / 2$ Gain = {config.get('half_pi_gain_ge', config.get('half_pi_gain', 'n/a'))}")
 
@@ -1713,14 +1714,24 @@ def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,
         # Corrected qubit frequency and the fitted starting phase, written
         # under the axes above the data-path stamp. The fit reports the phase
         # in radians; degrees, less 360, then mod 360.
-        new_freq_ge = (config['qubit_freq_ge']
-                       - (fit_results['f'][0] * 1e3 - config['ramsey_freq']))
+        # The fringe sits at (drive - qubit). With detuned_pulse = 'True' both
+        # pulses were played at qubit_freq_ge + ramsey_freq; otherwise the phase
+        # advance on the second pulse stands in for that same detuning. The
+        # saved qubit_freq_ge is the undetuned value either way, so the Ramsey
+        # frequency is subtracted back off the same way in both cases.
+        fringe = fit_results['f'][0] * 1e3
+        drive_freq = config['qubit_freq_ge'] + config['ramsey_freq']
+        new_freq_ge = drive_freq - fringe
         _report_config_values(config, {'qubit_freq_ge': float(new_freq_ge)})
         phase_deg = (np.degrees(fit_results['phase'][0]) - 360.0)
+        breakdown = (f"  (drive {drive_freq:.3f} - fringe {fringe:.4f})" if detuned else "")
         fig.text(0.5, 0.07,
-                 f"Measured qubit frequency: {new_freq_ge:.6f} MHz      "
+                 f"Measured qubit frequency: {new_freq_ge:.6f} MHz{breakdown}      "
                  f"Starting phase: {phase_deg:.2f} deg",
                  ha='center', va='bottom', fontsize=9)
+        if detuned:
+            print(f"  Drive detuned by {config['ramsey_freq']:+g} MHz: "
+                  f"{drive_freq:.6f} MHz drive - {fringe:.6f} MHz fringe")
         print(f"  Measured Qubit frequency: {new_freq_ge:.6f} MHz")
         print(f"  Starting phase:      {phase_deg:.2f} deg")
     if show_plot:

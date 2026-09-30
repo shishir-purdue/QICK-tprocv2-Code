@@ -51,10 +51,10 @@ print(expt_name + '\n')
 print(config)
 
 # ----- Which qubits to run, and where the data goes ----- #
-# meas_all = 'True' in system_config.json runs every qubit in qubit_list one
+# meas_list = 'True' in system_config.json runs every qubit in qubit_list one
 # after another into a numbered folder; otherwise just the configured qubit,
 # into DATA_PATH, as before.
-qubit_list, data_path_all = setup_meas_all(config, expt_name)
+qubit_list, meas_data_path = setup_meas_list(config, expt_name)
 base_expt_name = expt_name
 
 ##################
@@ -88,7 +88,7 @@ class SingleToneSpectroscopyProgram(AveragerProgramV2):
 
 
 for QUBIT_INDEX in qubit_list:
-    # QUBIT_INDEX is the qubit being measured, numbered from 1. With meas_all
+    # QUBIT_INDEX is the qubit being measured, numbered from 1. With meas_list
     # off the list holds just the configured qubit and this runs once. The
     # config is rebuilt for each qubit; it also has to be rebuilt each pass
     # anyway, because the save block deletes the swept parameter (a QickParam,
@@ -153,7 +153,7 @@ for QUBIT_INDEX in qubit_list:
         exp_name = expt_name + '_Q' + str(QUBIT_INDEX) + '_' + prefix
         print('Experiment name: ' + exp_name)
 
-        data_path = data_path_all
+        data_path = meas_data_path
 
         fname = get_next_filename(data_path, exp_name, suffix='.h5')
         print('Current data file: ' + fname)
@@ -210,7 +210,7 @@ for QUBIT_INDEX in qubit_list:
         exp_name = expt_name + '_' + prefix
         print('Experiment name: ' + exp_name)
 
-        data_path = data_path_all
+        data_path = meas_data_path
 
         fname = get_next_filename(data_path, exp_name, suffix='.h5')
         print('Current data file: ' + fname)

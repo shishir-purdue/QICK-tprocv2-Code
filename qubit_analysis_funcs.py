@@ -214,7 +214,7 @@ def _report_config_values(config, values):
     Print fit results as the config entries they belong in, ready to paste.
 
     Each value is printed as its system_config.json key for this qubit, and
-    remembered so that when a whole meas_all folder is analysed the wrapper
+    remembered so that when a whole meas_list folder is analysed the wrapper
     can print the assembled 7-element lists afterwards.
 
     Parameters
@@ -255,7 +255,7 @@ def _print_config_lists():
 
 def _accepts_folder(func):
     """
-    Let a single-file analysis function take a meas_all folder instead.
+    Let a single-file analysis function take a meas_list folder instead.
 
     If the name passed as filename is a folder under global_data_path, the
     function is run on every .h5 in it (sorted, so in qubit order as written),

@@ -38,7 +38,8 @@ NUM_QUBITS = system_config['num_qubits']
 QUBIT_INDEX = system_config['qubit_index']
 MUX = system_config['MUX']
 SS = system_config['SS']
-MEAS_ALL = system_config.get('meas_all', 'False')
+# meas_list was called meas_all; a config that still uses the old name works
+MEAS_LIST = system_config.get('meas_list', system_config.get('meas_all', 'False'))
 QUBIT_LIST = list(system_config.get('qubit_list', range(1, NUM_QUBITS + 1)))
 
 hw_cfg = system_config['hw_cfg']
@@ -92,7 +93,7 @@ def initialize_configs(expt_name, qubit_index=None):
 
     expt_name: a string name for the experiment
     qubit_index: which qubit, numbered from 1 as everywhere else in the configs.
-                 Defaults to system_config['qubit_index']; the meas_all loop
+                 Defaults to system_config['qubit_index']; the meas_list loop
                  in each experiment passes the qubit it is on.
 
     returns:
@@ -140,17 +141,20 @@ def initialize_configs(expt_name, qubit_index=None):
     return config, expt_name
 
 
-def setup_meas_all(config, expt_name):
+def setup_meas_list(config, expt_name):
     '''
-    setup_meas_all decides which qubits an experiment runs on and where it saves.
+    setup_meas_list decides which qubits an experiment runs on and where it saves.
 
-    With meas_all = 'True' in system_config.json the experiment runs on every
+    With meas_list = 'True' in system_config.json the experiment runs on every
     qubit in qubit_list (1-based; all qubits if the key is absent), one after
     another, and every file goes into a fresh numbered subfolder of DATA_PATH
-    named after the experiment. Otherwise it runs on the one configured qubit
-    and saves straight into DATA_PATH, exactly as before. Both keys sit at the
-    top of the 'config' section next to MUX and SS, so they are read from
-    there (MEAS_ALL, QUBIT_LIST), not from the per-qubit config passed in.
+    named after the experiment and the qubits: "_all_" when qubit_list covers
+    every qubit, otherwise the qubit numbers run together, e.g. "_Q145_" for
+    qubits 1, 4 and 5 (single-digit qubit numbers assumed). Otherwise it runs
+    on the one configured qubit and saves straight into DATA_PATH, as before.
+    Both keys sit at the top of the 'config' section next to MUX and SS, so
+    they are read from there (MEAS_LIST, QUBIT_LIST), not from the per-qubit
+    config passed in.
 
     config: the configuration dictionary from initialize_configs (unused, kept
             so the call reads naturally alongside initialize_configs)
@@ -160,20 +164,24 @@ def setup_meas_all(config, expt_name):
         qubit_list: the qubits to run, in order (1-based)
         data_path: the folder the data files go in
     '''
-    if MEAS_ALL != 'True':
+    if MEAS_LIST != 'True':
         return [QUBIT_INDEX], DATA_PATH
 
     qubit_list = list(QUBIT_LIST)
+    if set(qubit_list) == set(range(1, NUM_QUBITS + 1)):
+        qubit_tag = 'all'
+    else:
+        qubit_tag = 'Q' + ''.join(str(q) for q in qubit_list)
 
     # One numbered folder per invocation, so repeated runs stay separate. The
     # number is one past the highest already sitting in DATA_PATH.
-    folder_suffix = expt_name + '_all_' + str(datetime.date.today())
+    folder_suffix = expt_name + '_' + qubit_tag + '_' + str(datetime.date.today())
     existing = [d for d in os.listdir(DATA_PATH)
                 if os.path.isdir(os.path.join(DATA_PATH, d)) and d[:5].isdigit()]
     next_num = max([int(d[:5]) for d in existing], default=-1) + 1
     data_path = os.path.join(DATA_PATH, f"{next_num:05d}_{folder_suffix}")
     os.makedirs(data_path, exist_ok=True)
-    print(f"meas_all: running on qubits {qubit_list}, saving into {data_path}")
+    print(f"meas_list: running on qubits {qubit_list}, saving into {data_path}")
     return qubit_list, data_path
 
 

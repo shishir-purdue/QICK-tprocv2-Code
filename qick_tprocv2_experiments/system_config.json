@@ -1,7 +1,7 @@
 {
-   "DATA_PATH": "C:/Users/G41Lab/Dropbox/_Data/20260408 - Shishir - 8 qubit lattice PUR1D4",
+   "DATA_PATH": "C:\\Users\\G41Lab\\Dropbox\\_Data\\20260727 - Shishir - 7Q1D FUN13PUR1D4\\AllQubitsZeroFlux\\data",
    "zcu216_info": {
-      "ns_host": "192.168.1.149",
+      "ns_host": "192.168.1.147",
       "ns_port": 8000,
       "proxy_name": "rfsoc",
       "fast_gen_chs": [
@@ -42,27 +42,26 @@
       ]
    },
    "config": {
-      "full_auto": 1,
+      "full_auto": 0,
       "num_qubits": 7,
-      "qubit_index": 1, 
-      "SS": "False",
-      "meas_all": "False",
-      "qubit_list": [1, 2, 3, 4, 5, 6, 7],
+      "qubit_index": 3, 
+      "SS": "True",
+      "meas_list": "False",
+      "qubit_list":  [1,2,3,4,5,6,7],
       "MUX": "False",
       "dac": [
          0.0,
          0.0,
-         -0.3010253229576271,
-         0.03738378908474582,
-         -0.02990962746610165,
-         -0.09947848914406782,
-         0.9997050847457627,
-         0.49232188359745765,
-         0.22607596087711856
+         0.0,
+         0.0,
+         0.0,
+         0.0,
+         0.0
       ],
+      "coil" : 0,
       "hw_cfg": {
          "qubit_ch": [
-            9,
+            0,
             0,
             0,
             0,
@@ -89,7 +88,7 @@
             0
          ],
          "mux_ch": 4,
-         "nqz_qubit": 2,
+         "nqz_qubit": 1,
          "nqz_res": 2,
          "ro_ch": [
             0,
@@ -111,28 +110,20 @@
          ]
       },
       "readout_cfg": {
-         "trig_time": 0.5,
-         "ro_length": 2,
-         "mixer_freq": 5250,
-         "res_freq_ge": [
-            6171.581,
-            6307.35459717713,
-            6201.473188705443,
-            6125.657677688599,
-            6228.786161041259,
-            6149.0,
-            6272.85604473114
-         ],
+         "trig_time": 0.55,
+         "ro_length": 10.4,
+         "mixer_freq": 6250,
+         "res_freq_ge":  [7200.5145373564055, 7370.277346852894, 7038.277805319065, 7323.46693625867, 7094.426810833413, 7264.352011010076, 7147.084733046789],
          "res_gain_ge": [
-            0.01,
-            1,
-            0.004,
-            0.004,
-            0.04,
-            0.004,
-            0.07
+            0.4,
+            0.4,
+            0.4,
+            0.4,
+            0.3,
+            0.4,
+            0.15
          ],
-         "res_length_ge": 2,
+         "res_length_ge": 10.5,
          "res_freq_ef": [
             0,
             0,
@@ -143,15 +134,15 @@
             0
          ],
          "res_gain_ef": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
+            0.05,
+            0.05,
+            0.05,
+            0.05,
+            0.05,
+            0.05,
+            0.05
          ],
-         "res_length_ef": 2,
+         "res_length_ef": 10.1,
          "res_phase": [
             0,
             0,
@@ -172,36 +163,24 @@
          ]
       },
       "qubit_cfg": {
-         "qubit_freq_ge": [
-            4902.159951,
-            3681.678819176206,
-            3676.716533750981,
-            3653.523794537821,
-            5206.8,
-            4000.2649395694366,
-            3836.207382471576
-         ],
+         "qubit_freq_ge": [3865.61632163148, 3927.1654459274837, 3740.593331546775, 3871.8670388200344, 3801.4343357157036, 3937.0321992900604, 3970.6132225784036],
          "qubit_gain_ge": [
-            0.2,
-            1,
-            0.05,
-            0.05,
-            0.3,
-            0.05,
-            0.201
+            0.019,
+            0.013,
+            0.0135,
+            0.016,
+            0.034,
+            0.016,
+            0.011
          ],
-         "half_pi_gain_ge": [
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0
-         ],
+         "half_pi_gain_ge": [0.00836, 0.006, 0.00515, 0.00885, 0.017, 0.00786, 0.005],
+
+         "alpha_ge": [0.0, 0.0, -1.7891, 0.0, 0.0, 0.0, 0.0],
+
+         "anharmonicity_ge": [-200.0, -200.0, -200.0, -200.0, -200.0, -200.0, -200.0],
          "qubit_length_ge": 5,
          "qubit_freq_ef": [
-            0,
+            6000,
             0,
             0,
             0,
@@ -210,7 +189,7 @@
             0
          ],
          "qubit_gain_ef": [
-            0,
+            0.05,
             0,
             0,
             0,
@@ -221,16 +200,16 @@
          "qubit_length_ef": 25.0,
          "qubit_phase": 0,
          "sigma_ge": [
-            0.05,
-            0.05,
-            0.05,
-            0.05,
+            0.03,
+            0.03,
+            0.03,
             0.03,
             0.05,
-            0.05
+            0.05,
+            0.03
          ],
          "sigma_ef": [
-            0,
+            0.2,
             0,
             0,
             0,
@@ -253,9 +232,9 @@
       },
       "res_spec_ge": {
          "reps": 100,
-         "py_avg": 100,
-         "span_below": 5,
-         "span_above": 5,
+         "py_avg": 10,
+         "span_below": 10,
+         "span_above": 10,
          "steps": 200,
          "relax_delay": 10
       },
@@ -278,13 +257,13 @@
       },
       "qubit_spec_ge": {
          "reps":100,
-         "py_avg": 5,
+         "py_avg": 10,
          "span_below": 300,
          "span_above": 100,
          "steps": 300,
          "relax_delay": 100,
          "night_wait" : 5,
-         "night_num" : 10
+         "night_num" : 100
       },
       "time_rabi_ge": {
          "reps": 500,
@@ -312,7 +291,7 @@
       },
       "power_rabi_ge": {
          "reps": 100,
-         "py_avg": 20,
+         "py_avg": 10,
          "start": [
             0.0,
             0.0,
@@ -323,13 +302,13 @@
             0.0
          ],
          "stop": [
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0,
-            1.0
+            0.04,
+            0.04,
+            0.04,
+            0.04,
+            0.06,
+            0.04,
+            0.04
          ],
          "steps": 150,
          "relax_delay": 200
@@ -338,55 +317,64 @@
          "reps": 100,
          "py_avg": 10,
          "start": [
-            0.008,
+            0.009,
             0.0,
-            0.0,
+            0.004,
             0.0,
             0.0,
             0.0,
             0.0
          ],
-         "stop": [
-            0.01,
+         "stop":[
+            0.0013,
             0.1,
-            0.1,
+            0.008,
             0.1,
             0.2,
             0.1,
             0.1
          ],
-         "steps": 15,
-         "relax_delay": 300,
-         "N": 3
+         "steps": 20,
+         "relax_delay": 500,
+         "N":0
       },
       "repeat_X180_pulse_ge": {
          "reps": 100,
          "py_avg": 10,
          "start": [
-            0.008,
+            0.023,
             0.0,
-            0.0,
+            0.01,
             0.0,
             0.0,
             0.0,
             0.0
          ],
          "stop": [
-            0.01,
+            0.028,
             0.1,
-            0.1,
+            0.016,
             0.1,
             0.2,
             0.1,
             0.1
          ],
-         "steps": 15,
-         "relax_delay": 300,
-         "N": 3
+         "steps": 30,
+         "relax_delay": 500,
+         "N":0
+      },
+      "drag_alpha_ge": {
+         "reps": 100,
+         "py_avg": 10,
+         "start": [-2.0, -2.0, -2.0, -2.0, -2.0, -2.0, -2.0],
+         "stop": [2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0],
+         "steps": 41,
+         "N_list": [1, 3, 5],
+         "relax_delay": 300
       },
       "Ramsey_ge": {
          "reps": 100,
-         "py_avg": 20,
+         "py_avg": 10,
          "start": [
             0.0,
             0.0,
@@ -398,22 +386,24 @@
          ],
          "stop": [
             1.5,
-            5,
-            5,
-            5,
-            5,
-            5,
-            5
+            1.5,
+            1.5,
+            1.5,
+            1.5,
+            1.5,
+            1.5,
+            1.5
          ],
-         "steps": 300,
-         "ramsey_freq": 3,
-         "relax_delay": 200,
+         "steps": 200,
+         "ramsey_freq": 2,
+         "relax_delay": 400,
          "wait_time": 0.0,
-         "half_pi_gain": 0.100
+         "detuned_pulse": "False",
+         "drag": "True"
       },
       "ramsey_freq_calibration_ge": {
          "reps": 100,
-         "py_avg": 20,
+         "py_avg": 10,
          "start": [
             0.0,
             0.0,
@@ -427,16 +417,16 @@
             1.5,
             5,
             5,
-            5,
-            5,
+            2.5,
+            1.5,
             5,
             5
          ],
          "steps": 300,
          "ramsey_freq": 3,
-         "relax_delay": 200,
+         "relax_delay": 300,
          "wait_time": 0.0,
-         "half_pi_gain": 0.100
+         "half_pi_gain": 0.00913
       },
       "SpinEcho_ge": {
          "reps": 200,
@@ -459,13 +449,13 @@
             20,
             20
          ],
-         "steps": 150,
+         "steps": 200,
          "ramsey_freq": 1,
          "relax_delay": 500,
          "wait_time": 0.0
       },
-      "T1_ge": {
-         "reps": 200,
+      "T1_ge":  {
+         "reps": 100,
          "py_avg": 10,
          "start": [
             0.0,
@@ -477,23 +467,27 @@
             0.0
          ],
          "stop": [
-            150.0,
-            100.0,
-            100.0,
-            100.0,
-            150.0,
-            150.0,
-            100.0
+            120.0,
+            120.0,
+            120.0,
+            120.0,
+            120.0,
+            120.0,
+            120.0
          ],
-         "steps": 50,
-         "relax_delay": 200,
-         "wait_time": 0.0
+         "steps": 300,
+         "relax_delay": 300,
+         "wait_time": 0.0,
+         "night_wait" : 2.5,
+         "night_num" : 100
+         
+         
       },
       "res_spec_ef": {
          "reps": 100,
-         "py_avg": 100,
+         "py_avg": 10,
          "start": [
-            6150.0,
+            7190.0,
             0,
             0,
             0,
@@ -502,7 +496,7 @@
             0
          ],
          "stop": [
-            6190.0,
+            7210,
             0,
             0,
             0,
@@ -511,7 +505,7 @@
             0
          ],
          "steps": 200,
-         "relax_delay": 1000
+         "relax_delay": 300
       },
       "qubit_spec_ef": {
          "reps": 10,
@@ -617,7 +611,8 @@
          "py_avg": 1,
          "reps": 1,
          "relax_delay": 300,
-         "SS_ONLY": "True"
+         "SS_ONLY": "False",
+         "half_pi": "False"
       },
       "Readout_Optimization_ge": {
          "steps": 10000,
@@ -632,7 +627,7 @@
             0
          ],
          "gain_step_size": [
-            0.005,
+            0.002,
             0,
             0,
             0,
@@ -640,9 +635,9 @@
             0,
             0
          ],
-         "gain_steps": 8,
+         "gain_steps": 10,
          "freq_start": [
-            6170.27,
+            7202.3,
             0,
             0,
             0,
@@ -651,7 +646,7 @@
             0
          ],
          "freq_step_size": [
-            0.27,
+            0.02,
             0,
             0,
             0,
@@ -659,8 +654,10 @@
             0,
             0
          ],
-         "freq_steps": 7,
-         "relax_delay": 1000
+         "freq_steps": 10,
+         "relax_delay": 300,
+         "half_pi": "False"
+
       },
       "Readout_Optimization_gef": {
          "steps": 10,

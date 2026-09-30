@@ -46,8 +46,11 @@ def add_qubit_cfg(system_config, QubitIndex):
     var = ["qubit_freq_ge", "qubit_freq_ef", 
            "qubit_gain_ge", "qubit_gain_ef",
            "half_pi_gain_ge",
-           "sigma_ge", "sigma_ef"]
+           "sigma_ge", "sigma_ef",
+           "alpha_ge", "anharmonicity_ge"]   # DRAG X90; optional
     for Index in var:
+        if Index not in qubit_config:   # e.g. an older config without the DRAG keys
+            continue
         value = qubit_config[Index][QubitIndex - 1]
         qubit_config.update([(Index,value)])
     return qubit_config

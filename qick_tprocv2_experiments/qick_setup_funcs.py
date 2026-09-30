@@ -215,6 +215,23 @@ def declare_gen_ch(expt_func, cfg, ch, usage = 'res', suffix = ''):
                          mixer_freq=cfg['mixer_freq'])
 
 
+def _half_pi_envelope(expt_func, cfg, ch, suffix, drag):
+    '''
+    _half_pi_envelope declares the envelope of a pi/2 pulse and returns its name:
+    the plain Gaussian (sigma, 5 sigma long), or with drag=True the same Gaussian
+    plus the DRAG derivative quadrature, -alpha * dG/dt / anharmonicity (QICK's
+    add_DRAG, with alpha and anharmonicity from the config; alpha = 0 gives back
+    the plain Gaussian).
+    '''
+    if drag:
+        expt_func.add_DRAG(ch=ch, name="drag" + suffix, sigma=cfg['sigma' + suffix],
+                           length=cfg['sigma' + suffix]*5, even_length=True,
+                           delta=cfg['anharmonicity' + suffix], alpha=cfg['alpha' + suffix])
+        return "drag" + suffix
+    expt_func.add_gauss(ch=ch, name="ramp" + suffix, sigma=cfg['sigma' + suffix], length=cfg['sigma' + suffix]*5, even_length=True)
+    return "ramp" + suffix
+
+
 def declare_pulse(expt_func, cfg, ch, usage = 'res', pulse_style = 'const', pulse_name = 'pulse', suffix = ''):
     '''
     declare_pulse declares a pulse to be sent properly depending on the configurations
@@ -224,12 +241,18 @@ def declare_pulse(expt_func, cfg, ch, usage = 'res', pulse_style = 'const', puls
     ch: The channel index that you want to declare
     usage: 'res' or 'qubit'
     pulse_style: type of pulse you want to send 'const', 'arb', 'flat_top' ('gauss' makes a gaussian pulse for us)
-    pulse_name: name of the pulse we will send ('ramsey1' and 'ramsey2' are special)
+    pulse_name: name of the pulse we will send ('ramsey1', 'ramsey2', 'X90', 'X90_neg',
+                'X90_drag' and 'X90_drag_neg' are special)
     suffix: do the parameters have a suffix? ('', '_ge', or '_ef')
 
     returns:
         nothing...
     '''
+    # 'drag': 'True' in the experiment block (e.g. Ramsey_ge, which 006c also
+    # uses) gives the pi/2 pulses - ramsey1/2, X90, X90_neg - the DRAG envelope
+    # at alpha_ge. Blocks without the key keep the plain Gaussian.
+    drag = cfg.get('drag', 'False') == 'True'
+
     if pulse_name in ('ramsey1', 'ramsey2'):
         # The two pi/2 pulses of a Ramsey sequence. 'detuned_pulse' in the
         # config picks how the Ramsey frequency is applied:
@@ -244,31 +267,45 @@ def declare_pulse(expt_func, cfg, ch, usage = 'res', pulse_style = 'const', puls
             freq = freq + cfg['ramsey_freq']
         elif pulse_name == 'ramsey2':
             phase = phase + cfg['wait_time']*360.0*cfg['ramsey_freq']
-        expt_func.add_gauss(ch=ch, name="ramp" + suffix, sigma=cfg['sigma' + suffix], length=cfg['sigma' + suffix]*5, even_length=True)
+        envelope = _half_pi_envelope(expt_func, cfg, ch, suffix, drag)
         expt_func.add_pulse(ch=ch, name=pulse_name, ro_ch=None,
                     style="arb",
-                    envelope="ramp" + suffix,
+                    envelope=envelope,
                     freq=freq,
                     phase=phase,
                     gain=cfg['half_pi_gain' + suffix],
                     )
     elif pulse_name == 'X90':
-        expt_func.add_gauss(ch=ch, name="ramp" + suffix, sigma=cfg['sigma' + suffix], length=cfg['sigma' + suffix]*5, even_length=True)
-        expt_func.add_pulse(ch=ch, name=pulse_name, ro_ch=None, 
-                    style="arb", 
-                    envelope="ramp" + suffix, 
+        envelope = _half_pi_envelope(expt_func, cfg, ch, suffix, drag)
+        expt_func.add_pulse(ch=ch, name=pulse_name, ro_ch=None,
+                    style="arb",
+                    envelope=envelope,
                     freq=cfg[usage + '_freq' + suffix], 
                     phase=cfg[usage + '_phase'],
                     gain=cfg['half_pi_gain' + suffix], 
+                    )
+    elif pulse_name in ('X90_drag', 'X90_drag_neg'):
+        # X90 with a DRAG envelope: the same Gaussian (sigma, 5 sigma long, half_pi
+        # gain) plus a derivative quadrature, -alpha * dG/dt / anharmonicity (QICK's
+        # add_DRAG). alpha_ge = 0 gives back the plain Gaussian X90. '_neg' is the
+        # same pulse 180 deg round, for the X90 / X90_neg identity pairs of the
+        # alpha calibration (005c_drag_alpha_ge.py).
+        envelope = _half_pi_envelope(expt_func, cfg, ch, suffix, drag=True)
+        expt_func.add_pulse(ch=ch, name=pulse_name, ro_ch=None,
+                    style="arb",
+                    envelope=envelope,
+                    freq=cfg[usage + '_freq' + suffix],
+                    phase=cfg[usage + '_phase'] - (180 if pulse_name == 'X90_drag_neg' else 0),
+                    gain=cfg['half_pi_gain' + suffix],
                     )
     elif pulse_name == 'X90_neg':
         # X90 with its phase shifted by 180 deg: rotates about -X, so it undoes an
         # X90 exactly only if the two pulses really are 180 deg apart. Used by the
         # Ramsey phase-error amplification experiment.
-        expt_func.add_gauss(ch=ch, name="ramp" + suffix, sigma=cfg['sigma' + suffix], length=cfg['sigma' + suffix]*5, even_length=True)
-        expt_func.add_pulse(ch=ch, name=pulse_name, ro_ch=None, 
-                    style="arb", 
-                    envelope="ramp" + suffix, 
+        envelope = _half_pi_envelope(expt_func, cfg, ch, suffix, drag)
+        expt_func.add_pulse(ch=ch, name=pulse_name, ro_ch=None,
+                    style="arb",
+                    envelope=envelope,
                     freq=cfg[usage + '_freq' + suffix], 
                     phase=cfg[usage + '_phase'] - 180,
                     gain=cfg['half_pi_gain' + suffix], 

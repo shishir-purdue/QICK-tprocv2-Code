@@ -101,14 +101,14 @@ class RamseyProgram(AveragerProgramV2):
 ###################
 
 # Hardcoded for now - the applied Ramsey frequencies (MHz) to step through
-RAMSEY_FREQS = [1, 2, 3, 4, 5, 6]
+RAMSEY_FREQS = [2, 4, 6, 8, 10, 12]
 
 # The delay sweep is sized from the applied frequency rather than fixed:
 # cover N_PERIODS full fringes at TARGET_STEP_NS between points, and refuse
 # to run coarser than MAX_STEP_NS whatever the frequency works out to.
 N_PERIODS = 4
 TARGET_STEP_NS = 5.0
-MAX_STEP_NS = 10.0
+MAX_STEP_NS = 20.0
 
 # Keep the name we looked the config up with: initialize_configs appends
 # '_mux' to what it is handed, so feeding expt_name back in would grow a

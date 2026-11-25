@@ -1,9 +1,10 @@
 {
-   "DATA_PATH": "C:\\Users\\G41Lab\\Dropbox\\_Data\\20260727 - Shishir - 7Q1D FUN13PUR1D4\\AllQubitsZeroFlux\\data",
+   "DATA_PATH": "C:\\Users\\G41Lab\\Dropbox\\_Data\\20260727 - Shishir - 7Q1D FUN13PUR1D4\\FastFluxTest_Q1\\data",
    "zcu216_info": {
-      "ns_host": "192.168.1.147",
-      "ns_port": 8000,
+      "ns_host": "xxx.xxx.xxx.xxx",
+      "ns_port": "xxxx",
       "proxy_name": "rfsoc",
+      "external_clk":"True",
       "fast_gen_chs": [
          0,
          1,
@@ -44,13 +45,13 @@
    "config": {
       "full_auto": 0,
       "num_qubits": 7,
-      "qubit_index": 3, 
+      "qubit_index": 1, 
       "SS": "True",
       "meas_list": "False",
-      "qubit_list":  [1,2,3,4,5,6,7],
+      "qubit_list":  [1,2],
       "MUX": "False",
       "dac": [
-         0.0,
+         5.0,
          0.0,
          0.0,
          0.0,
@@ -61,7 +62,7 @@
       "coil" : 0,
       "hw_cfg": {
          "qubit_ch": [
-            0,
+            2,
             0,
             0,
             0,
@@ -111,19 +112,19 @@
       },
       "readout_cfg": {
          "trig_time": 0.55,
-         "ro_length": 10.4,
+         "ro_length": 5.4,
          "mixer_freq": 6250,
-         "res_freq_ge":  [7200.5145373564055, 7370.277346852894, 7038.277805319065, 7323.46693625867, 7094.426810833413, 7264.352011010076, 7147.084733046789],
+         "res_freq_ge": [7200.3, 7369.632634680918, 7037.848742049603, 7322.821388785442, 7093.898491510195, 7263.901162980181, 7146.647351614923],
          "res_gain_ge": [
-            0.4,
-            0.4,
-            0.4,
-            0.4,
-            0.3,
-            0.4,
-            0.15
+            0.105,
+            0.2,
+            0.05,
+            0.25,
+            0.25,
+            0.25,
+            0.25
          ],
-         "res_length_ge": 10.5,
+         "res_length_ge": 5.5,
          "res_freq_ef": [
             0,
             0,
@@ -163,17 +164,17 @@
          ]
       },
       "qubit_cfg": {
-         "qubit_freq_ge": [3865.61632163148, 3927.1654459274837, 3740.593331546775, 3871.8670388200344, 3801.4343357157036, 3937.0321992900604, 3970.6132225784036],
+         "qubit_freq_ge": [4527.8478, 3884.3636261402926, 3910.2039092590057, 3754.0189089250616, 3766.3238936541766, 4006.4404409743233, 4006.367072925171],
          "qubit_gain_ge": [
-            0.019,
-            0.013,
-            0.0135,
+            0.08126,
             0.016,
-            0.034,
-            0.016,
-            0.011
+            0.008,
+            0.028,
+            0.040,
+            0.018,
+            0.028
          ],
-         "half_pi_gain_ge": [0.00836, 0.006, 0.00515, 0.00885, 0.017, 0.00786, 0.005],
+         "half_pi_gain_ge": [0.04063, 0.007, 0.00415, 0.014, 0.025, 0.009, 0.014],
 
          "alpha_ge": [0.0, 0.0, -1.7891, 0.0, 0.0, 0.0, 0.0],
 
@@ -201,12 +202,12 @@
          "qubit_phase": 0,
          "sigma_ge": [
             0.03,
-            0.03,
+            0.04,
             0.03,
             0.03,
             0.05,
-            0.05,
-            0.03
+            0.075,
+            0.05
          ],
          "sigma_ef": [
             0.2,
@@ -227,14 +228,14 @@
    "expt_cfg": {
       "tof": {
          "reps": 1,
-         "soft_avgs": 1000,
+         "soft_avgs": 100,
          "relax_delay": 10
       },
       "res_spec_ge": {
          "reps": 100,
          "py_avg": 10,
-         "span_below": 10,
-         "span_above": 10,
+         "span_below": 8,
+         "span_above": 8,
          "steps": 200,
          "relax_delay": 10
       },
@@ -258,10 +259,10 @@
       "qubit_spec_ge": {
          "reps":100,
          "py_avg": 10,
-         "span_below": 300,
-         "span_above": 100,
-         "steps": 300,
-         "relax_delay": 100,
+         "span_below": 350,
+         "span_above": 50,
+         "steps": 200,
+         "relax_delay": 150,
          "night_wait" : 5,
          "night_num" : 100
       },
@@ -302,7 +303,7 @@
             0.0
          ],
          "stop": [
-            0.04,
+            0.1,
             0.04,
             0.04,
             0.04,
@@ -317,7 +318,7 @@
          "reps": 100,
          "py_avg": 10,
          "start": [
-            0.009,
+            0.03,
             0.0,
             0.004,
             0.0,
@@ -326,7 +327,7 @@
             0.0
          ],
          "stop":[
-            0.0013,
+            0.0036,
             0.1,
             0.008,
             0.1,
@@ -373,7 +374,7 @@
          "relax_delay": 300
       },
       "Ramsey_ge": {
-         "reps": 100,
+         "reps": 200,
          "py_avg": 10,
          "start": [
             0.0,
@@ -396,10 +397,10 @@
          ],
          "steps": 200,
          "ramsey_freq": 2,
-         "relax_delay": 400,
+         "relax_delay": 200,
          "wait_time": 0.0,
          "detuned_pulse": "False",
-         "drag": "True"
+         "drag": "False"
       },
       "ramsey_freq_calibration_ge": {
          "reps": 100,
@@ -467,7 +468,7 @@
             0.0
          ],
          "stop": [
-            120.0,
+            80.0,
             120.0,
             120.0,
             120.0,
@@ -611,14 +612,14 @@
          "py_avg": 1,
          "reps": 1,
          "relax_delay": 300,
-         "SS_ONLY": "False",
+         "SS_ONLY": "True",
          "half_pi": "False"
       },
       "Readout_Optimization_ge": {
          "steps": 10000,
          "py_avg": 1,
          "gain_start": [
-            0.035,
+            0.07,
             0.005,
             0.005,
             0.005,
@@ -627,7 +628,7 @@
             0
          ],
          "gain_step_size": [
-            0.002,
+            0.005,
             0,
             0,
             0,
@@ -635,9 +636,9 @@
             0,
             0
          ],
-         "gain_steps": 10,
+         "gain_steps": 8,
          "freq_start": [
-            7202.3,
+            7200.3,
             0,
             0,
             0,
@@ -646,7 +647,7 @@
             0
          ],
          "freq_step_size": [
-            0.02,
+            0.05,
             0,
             0,
             0,
@@ -727,6 +728,22 @@
          "relax_delay": 200,
          "detuning_range": 10,
          "detuning_steps": 21
+      },
+      "fast_flux_readout": {
+         "reps": 1000,
+         "py_avg": 10,
+         "relax_delay": 150,
+         "ff_length": 10.0,
+         "ff_gain": -0.3,
+         "readout_delay": 5.0,
+         "q_delay": 1.0,
+         "trig_offset": 0.02,
+         "ff_compensation_wait": 15.0,
+         "max_ff_gain": 0.5,
+         "hdawg_channel": 0,
+         "hdawg_trigger_pin": 1,
+         "hdawg_sample_rate": 2400000000.0,
+         "hdawg_output_range": 1.0
       }
    },
    "qubit_index": 1

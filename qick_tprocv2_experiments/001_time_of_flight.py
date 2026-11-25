@@ -62,17 +62,17 @@ print(config)
 if MUX == 'True': # MUX case
     config.update(
         [('mixer_freq', 6000),
-        ('res_freq', [6000 + 25*(i+1) for i in range(NUM_QUBITS)]), 
+        ('res_freq', [7000 + 25*(i+1) for i in range(NUM_QUBITS)]), 
         ('res_gain', [0.1] * NUM_QUBITS), 
         ('res_length', 0.5), #[0.5] * NUM_QUBITS), 
         ('ro_length', 1.5)])
 else: # non-MUX case
     config.update(
         [('mixer_freq', 6000),
-        ('res_freq', 6025),
+        ('res_freq', 6900),
         ('res_gain', 1), 
         ('res_length', 1), 
-        ('ro_length', 1)])
+        ('ro_length', 0.9)])
 
 print(config)
 

@@ -98,7 +98,7 @@ def fast_flux_qubit_spec(q_time, ff_length, ff_index):
                 self.pulse(ch=self.cfg['res_ch'], name="res_pulse", t=t_offset - q_time) # why? -> relative to q_time
                 self.trigger(ros=[self.cfg['ro_ch']], pins=[0], t=self.cfg['trig_time']+t_offset)
 
-                self.trigger(pins=[1], t=np.abs(q_time)) # why isnt t=0? -> ITS RELATIVE
+                self.trigger(pins=[5], t=np.abs(q_time)) # why isnt t=0? -> ITS RELATIVE
                 self.pulse(ch=self.cfg["qubit_ch"], name="qubit_pulse", t=0.02)
             else:
                 # if non-MUX then send readout configurations - useful when freq sweeping
@@ -107,7 +107,7 @@ def fast_flux_qubit_spec(q_time, ff_length, ff_index):
                 self.pulse(ch=self.cfg['res_ch'], name="res_pulse", t=t_offset)
                 self.trigger(ros=[self.cfg['ro_ch']], pins=[0], t=self.cfg['trig_time']+t_offset)
 
-                self.trigger(pins=[1], t=0)
+                self.trigger(pins=[5], t=0)
                 self.pulse(ch=self.cfg["qubit_ch"], name="qubit_pulse", t=0.02 + q_time)
 
     ###################
@@ -187,7 +187,7 @@ def fast_flux_qubit_spec(q_time, ff_length, ff_index):
     exp_name = expt_name + '_Q' + str(QUBIT_INDEX) + '_FF' + str(ff_index) + '_' + prefix
     print('Experiment name: ' + exp_name)
 
-    data_path = DATA_PATH
+    data_path = SWEEP_DATA_PATH  # this sweep's own folder, made below before the sweep starts
 
     fname = get_next_filename(data_path, exp_name, suffix='.h5')
     print('Current data file: ' + fname)
@@ -234,9 +234,9 @@ Here the sequence + waveforms are defined in awg_program.code
 ###############################
 
 #defining a connection
-device_id='dev9047'
+device_id='devxxxx'
 
-session = Session("127.0.0.1", 8004)  # IP address of rfsoc pc and port of the device
+session = Session("xxx.xxx.xxx.xxx", "xxxx")  # IP address of rfsoc pc and port of the device
 print("devices ready to be connected",session.devices.visible())
 device = session.connect_device(device_id)
 print("connected to",session.devices.connected())
@@ -356,6 +356,15 @@ awg_program_2.code = """
 q_times = np.linspace(-1, 22, 50) # in us
 # q_times = [0]
 ff_length = 20 # fast flux length in us
+
+# one new numbered folder in DATA_PATH for the whole sweep
+folder_suffix = 'fast_flux_crosstalk_Q' + str(QUBIT_INDEX) + '_' + str(datetime.date.today())
+existing = [d for d in os.listdir(DATA_PATH)
+            if os.path.isdir(os.path.join(DATA_PATH, d)) and d[:5].isdigit()]
+next_num = max([int(d[:5]) for d in existing], default=-1) + 1
+SWEEP_DATA_PATH = os.path.join(DATA_PATH, f"{next_num:05d}_{folder_suffix}")
+os.makedirs(SWEEP_DATA_PATH)
+print('saving into ' + SWEEP_DATA_PATH)
 
 for q in range(NUM_QUBITS): # which qubit ff channel to run 
     if q == QUBIT_INDEX and True:

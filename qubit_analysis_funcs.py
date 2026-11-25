@@ -904,7 +904,7 @@ def analyze_qubit_spec_temporal_scan(global_data_path, folder_name,
     mtimes = [os.path.getmtime(os.path.join(folder_path, fname)) for fname in files]
     start_time = datetime.datetime.fromtimestamp(min(mtimes))
 
-    fig = plt.figure(figsize=(12, 6))
+    fig = plt.figure(figsize=(12,8))
     mesh = plt.pcolormesh(time_axis, freqs_ref, z_data, shading='auto')
     plt.colorbar(mesh, label='Amplitude (a.u.)')
     plt.plot(time_axis, peaks, marker='o', linestyle='-', c='red', label='peak')
@@ -980,7 +980,7 @@ def analyze_length_rabi(global_data_path, filename,
     else:
         ydata = amps
 
-    fig = plt.figure(figsize=(12, 6))
+    fig = plt.figure(figsize=(12,8))
     plt.plot(lengths, ydata, marker='o', label='data')
     if SS:
         plt.ylabel("Qubit Population")
@@ -1086,7 +1086,7 @@ def analyze_amplitude_rabi(global_data_path, filename,
     else:
         ydata = amps
 
-    fig = plt.figure(figsize=(12, 6))
+    fig = plt.figure(figsize=(12,8))
     if SS:
         plt.ylabel("Qubit Population")
         plt.axhline(1, color='black', linestyle='--')
@@ -1200,7 +1200,7 @@ def analyze_repeat_X90_pulse(global_data_path, filenames,
 
     # Explicit axes, so the figures _plot_ge_calibration opens do not steal
     # the traces from underneath us.
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(12,8))
     colors = plt.cm.tab10(np.arange(len(filenames)) % 10)
     stamp_lines = []
 
@@ -1476,7 +1476,7 @@ def analyze_repeat_X180_pulse(global_data_path, filenames,
 
     # Explicit axes, so the figures _plot_ge_calibration opens do not steal
     # the traces from underneath us.
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(12,8))
     colors = plt.cm.tab10(np.arange(len(filenames)) % 10)
     stamp_lines = []
 
@@ -1668,7 +1668,7 @@ def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,
 
     x_ns = delay_times * 1000  # convert us -> ns
 
-    fig = plt.figure(figsize=(12, 6))
+    fig = plt.figure(figsize=(12,8))
     plt.plot(x_ns, ydata, marker='o', label='data')
     if SS:
         plt.ylabel("Qubit Population")
@@ -1702,14 +1702,14 @@ def analyze_t2_ramsey(global_data_path, filename, my_offset=0.0,
         half_amp = (amp / 2) * np.exp(-x_ns / T2)
         baseline = fit_results['fit_func'](x_ns) - half_amp * np.cos(
             2 * np.pi * fit_results['f'][0] * x_ns + fit_results['phase'][0])
-        baseline = baseline + my_offset
+        # baseline = baseline + my_offset
 
         exp_lower = baseline - half_amp
         exp_upper = baseline + half_amp
         plt.plot(x_ns, exp_lower, label='fit lower bound')
         plt.plot(x_ns, exp_upper, label='fit upper bound')
         plt.plot(x_ns, baseline, color='black', linestyle='--',
-                 label=f"offset (-> {final_offset + my_offset:.3f})")
+                 label=f"offset = {baseline[0]:.3f})")
 
         # Corrected qubit frequency and the fitted starting phase, written
         # under the axes above the data-path stamp. The fit reports the phase
@@ -1893,7 +1893,7 @@ def analyze_ramsey_freq_calibration(global_data_path, filenames,
     else:
         free_slope = free_intercept = float('nan')
 
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(12,8))
     ax.plot(applied, measured, 'o', color='tab:blue', markersize=7,
             label='measured')
 
@@ -1927,7 +1927,7 @@ def analyze_ramsey_freq_calibration(global_data_path, filenames,
     # ----- Optional second figure: fitted phase ----- #
     fig_phase = None
     if plot_phase:
-        fig_phase, ax_p = plt.subplots(figsize=(12, 6))
+        fig_phase, ax_p = plt.subplots(figsize=(12,8))
         ax_p.plot(applied, phases, 'o-', color='tab:green', markersize=7,
                   label='fitted phase')
         ax_p.axhline(0, color='black', linestyle='--', linewidth=1)
@@ -2069,7 +2069,7 @@ def analyze_ramsey_ro_length(global_data_path, folder_name,
     order = np.argsort(ro_lengths)
     ro_lengths, phases, freqs = ro_lengths[order], phases[order], freqs[order]
 
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(12,8))
     ax.plot(ro_lengths, phases, 'o-', color='tab:green', markersize=7,
             label='fitted phase')
     ax.axhline(0, color='black', linestyle='--', linewidth=1)
@@ -2255,7 +2255,7 @@ def analyze_ramsey_phase_error(global_data_path, folder_name,
     else:
         slope, intercept, rms = float('nan'), float(phases[0]), float('nan')
 
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(12,8))
     ax.plot(n_pulses, phases, 'o', color='tab:blue', markersize=8,
             label='fitted phase')
     if len(n_pulses) > 1:
@@ -2292,7 +2292,7 @@ def analyze_ramsey_phase_error(global_data_path, folder_name,
         plt.show()
 
     # ----- Composite: every fringe on one axes, labelled by its phase ----- #
-    fig_curves, ax_c = plt.subplots(figsize=(12, 6))
+    fig_curves, ax_c = plt.subplots(figsize=(12,8))
     colors = plt.cm.viridis(np.linspace(0, 0.9, len(traces)))
     for (x, y, y_fit), N, ph_deg, col in zip(traces, Ns, phases, colors):
         ax_c.plot(x, y, 'o', color=col, markersize=4,
@@ -2370,7 +2370,7 @@ def analyze_t2_spin_echo(global_data_path, filename,
 
     delay_times = delay_times1 + delay_times2
 
-    fig = plt.figure(figsize=(12, 6))
+    fig = plt.figure(figsize=(12,8))
     plt.plot(delay_times, ydata, marker='o', label='data')
     if SS:
         plt.ylabel("Qubit Population")
@@ -2446,7 +2446,7 @@ def analyze_t1(global_data_path, filename,
 
     x_ns = delay_times * 1000  # us -> ns
 
-    fig = plt.figure(figsize=(12, 6))
+    fig = plt.figure(figsize=(12,8))
     plt.plot(x_ns, ydata, marker='o', label='data')
     if SS:
         plt.ylabel("Qubit Population")
@@ -2550,7 +2550,7 @@ def analyze_T1_temporal_scan(global_data_path, folder_name,
     mtimes = [os.path.getmtime(os.path.join(folder_path, fname)) for fname in files]
     start_time = datetime.datetime.fromtimestamp(min(mtimes))
 
-    fig = plt.figure(figsize=(12, 6))
+    fig = plt.figure(figsize=(12,8))
     if error_bars:
         plt.errorbar(time_axis, T1_values/1e3, yerr=T1_errors/1e3,
                      marker='o', linestyle='-', label='T1',
@@ -2799,7 +2799,7 @@ def analyze_readout_fidelity_ro_length(global_data_path, folder_name,
     fid_projection, fid_hist = fid_projection[order], fid_hist[order]
     thresholds, angles = thresholds[order], angles[order]
 
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(12,8))
     if fidelity_method in ("method1", "both"):
         ax.plot(ro_lengths, fid_projection, 'o-', color='tab:blue',
                 markersize=7, label='projection (method 1)')

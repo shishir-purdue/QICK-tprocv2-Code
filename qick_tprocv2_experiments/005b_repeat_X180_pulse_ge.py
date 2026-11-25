@@ -79,10 +79,14 @@ class RepeatPulseProgram(AveragerProgramV2):
         
         declare_pulse(self, cfg, cfg['qubit_ch'], usage='qubit', 
                       pulse_style='gauss', pulse_name='qubit_pulse', suffix='_ge')
+        declare_pulse(self, cfg, cfg['qubit_ch'], usage='qubit', 
+                              pulse_style='gauss', pulse_name='X90', suffix='_ge')
 
     
     def _body(self, cfg):
-        for n in range(2 * (cfg['N']) + 1):
+        self.pulse(ch=self.cfg["qubit_ch"], name="X90", t=0)  #play probe pulse
+        self.delay_auto(t=0.01)
+        for n in range(cfg['N']):
             self.pulse(ch=self.cfg["qubit_ch"], name="qubit_pulse", t=0)  #play probe pulse
             self.delay_auto(t=0.01)
         # readout using proper configurations for MUX and non-MUX
@@ -93,7 +97,7 @@ class RepeatPulseProgram(AveragerProgramV2):
 ###################
 
 # Hardcoded upper limit for now - the loop runs N = 0 ... N_MAX - 1
-N_MAX = 5
+N_MAX = 6
 
 # Keep the name we looked the config up with: initialize_configs appends
 # '_mux' to what it is handed, so feeding expt_name back in would grow a

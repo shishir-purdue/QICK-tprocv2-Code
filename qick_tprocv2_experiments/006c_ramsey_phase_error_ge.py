@@ -123,11 +123,11 @@ class RamseyPhaseErrorProgram(AveragerProgramV2):
 
 # Hardcoded upper limit for now - the loop runs N = 0 ... N_MAX - 1 identities,
 # i.e. 0, 2, 4, ... extra pulses.
-N_MAX = 4
+N_MAX = 6
 
 # The delay sweep covers N_PERIODS fringes at TARGET_STEP_NS between points,
 # sized from ramsey_freq as in 006a. Just the first period here.
-N_PERIODS = 1
+N_PERIODS = 4
 TARGET_STEP_NS = 5.0
 MAX_STEP_NS = 20.0
 

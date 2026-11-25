@@ -73,7 +73,7 @@ print('Scan data folder: ' + scan_data_path)
 ###################
 
 # Hardcoded for now - the readout durations (us) to step through
-RO_LENGTHS = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0]
+RO_LENGTHS = np.arange(5, 12.1, 0.25)  # 4, 4.25, ..., 8 us
 
 # res_length_ge is held this far above ro_length on every pass, so the readout
 # pulse always outlasts the acquisition window by a fixed margin.

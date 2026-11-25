@@ -47,8 +47,8 @@ if SS == 'True':
     from SingleShot import SingleShotProgram_g, SingleShotProgram_e
 
 # ----- Overnight settings ----- #
-run_hours = 8.0
-qubit_list = list(range(1, NUM_QUBITS + 1))   # all qubits, 1-based
+run_hours = 4.0
+qubit_list = [1] # all qubits, 1-based
 
 start = datetime.datetime.now()
 overnight_data_path = os.path.join(DATA_PATH, 'overnight',

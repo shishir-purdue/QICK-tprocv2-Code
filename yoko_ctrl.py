@@ -1,8 +1,8 @@
 from malab.instruments.voltsource import *
 from malab.dsfit import fithanger_new_withQc
-# YOKO1 IP = "192.168.1.56"
-# YOKO2 IP = "192.168.1.57"
-dcflux2 = YokogawaGS200(address="192.168.1.77")
+# YOKO1 IP = "xxx.xxx.xxx.xxx"
+# YOKO2 IP = "xxx.xxx.xxx.xxx"
+dcflux2 = YokogawaGS200(address="xxx.xxx.xxx.xxx")
 dcflux2.recv_length = 1024
 print(dcflux2.recv_length)
 print(dcflux2.get_id())

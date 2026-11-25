@@ -57,8 +57,9 @@ from zhinst.toolkit.waveform import Wave, OutputType
 import numpy as np
 import time
 
+ff_length = 20
 
-def fast_flux_qubit_spec(q_time, ff_length):
+def fast_flux_qubit_spec(q_time, ff_length, readout_delay=2):
     '''
     Perform qubit spectroscopy, save data, and return qubit frequency found by looking for maximum amplitude.
     '''
@@ -88,7 +89,7 @@ def fast_flux_qubit_spec(q_time, ff_length):
                         pulse_style='gauss', pulse_name='qubit_pulse', suffix='_ge')
 
         def _body(self, cfg):
-            t_offset = ff_length + 2+0.02 # (ro delay, trig delay) time offset for the readout pulse (fixed)
+            t_offset = ff_length + readout_delay +0.02 # (ro delay, trig delay) time offset for the readout pulse (fixed)
 
             if q_time < 0:
                 # if non-MUX then send readout configurations - useful when freq sweeping
@@ -106,7 +107,7 @@ def fast_flux_qubit_spec(q_time, ff_length):
                 self.pulse(ch=self.cfg['res_ch'], name="res_pulse", t=t_offset)
                 self.trigger(ros=[self.cfg['ro_ch']], pins=[0], t=self.cfg['trig_time']+t_offset)
 
-                self.trigger(pins=[1], t=0)
+                self.trigger(pins=[1], width=1,t=0)
                 self.pulse(ch=self.cfg["qubit_ch"], name="qubit_pulse", t=0.02 + q_time)
 
     ###################
@@ -186,7 +187,7 @@ def fast_flux_qubit_spec(q_time, ff_length):
     exp_name = expt_name + '_Q' + str(QUBIT_INDEX) + '_' + prefix
     print('Experiment name: ' + exp_name)
 
-    data_path = DATA_PATH
+    data_path = SWEEP_DATA_PATH  # this sweep's own folder, made below before the sweep starts
 
     fname = get_next_filename(data_path, exp_name, suffix='.h5')
     print('Current data file: ' + fname)
@@ -200,6 +201,8 @@ def fast_flux_qubit_spec(q_time, ff_length):
         f.append('fpts', freqs)
         f.append('amps', amps)
         f.append('q_time', [q_time])
+        f.append('ff_length', [ff_length])
+        f.append('readout_delay', [readout_delay])
         if IS_VISDOM:
             f.append('avgi', expt_I)
             f.append('avgq', expt_Q)
@@ -233,9 +236,9 @@ Here the sequence + waveforms are defined in awg_program.code
 ###############################
 
 #defining a connection
-device_id='dev9047'
+device_id='devxxxx'
 
-session = Session("127.0.0.1", 8004)  # IP address of rfsoc pc and port of the device
+session = Session("xxx.xxx.xxx.xxx", "xxxx")  # IP address of rfsoc pc and port of the device
 print("devices ready to be connected",session.devices.visible())
 device = session.connect_device(device_id)
 print("connected to",session.devices.connected())
@@ -294,38 +297,48 @@ for i in awgs:
 # code works for all cores, just need to change index and trig
 awg_program = Sequence()
 # !! HARDCODED !! - need to manually change index
-awg_program.code = """
-    const sample_clock = 2.4e9; 
+awg_program.code = f"""
+    const sample_clock = 2.29376e9; 
     const sequencer_clock = sample_clock/8;
 
-    const pulse_length = 3e-6; // seconds
+    const pulse_length = {ff_length}e-6; // seconds
     const wait_length = 10e-6; // seconds
 
     const wait_samples = round(wait_length*sequencer_clock);
     const pulse_samples = round(pulse_length*sample_clock);
 
-    const amp = 0.1; // amplitude of the pulse
-
+    const amp = -0.3; // amplitude of the pulse
+    
     wave w_rect  = amp*rect(pulse_samples, 1);
     const trig = 1; // always 1 for the odd trigger?
     const index = 1; // if channel is odd => =1, else =2
     
-    while (true) {
+    while (true) {{
         waitDigTrigger(trig);
         playWave(index, w_rect);
         wait(wait_samples + pulse_samples / 8); // wait for the pulse to finish plus some time (wait_samples)
         playWave(index, -1*w_rect);
-      }
+      }}
     """
 
 
 ###########################
 #### Play waveforms ####
 ###########################
-num_pts = 51
-ff_length = 3 # fast flux length in us, you actually set this above in the code for the HDAWG sequence, need to make sure they match
-q_times = np.linspace(-1, ff_length + 2, num_pts) # in us
 
+num_pts = 20 # number of points in the sweep, need to make sure they match
+readout_delay = 1 # readout delay in us, you actually set this above in the code for the HDAWG sequence, need to make sure they match
+q_times =  np.linspace(1, ff_length - 0.3, num_pts) # in us
+
+
+# one new numbered folder in DATA_PATH for the whole sweep
+folder_suffix = 'fast_flux_distortion_Q' + str(QUBIT_INDEX) + '_' + str(datetime.date.today())
+existing = [d for d in os.listdir(DATA_PATH)
+            if os.path.isdir(os.path.join(DATA_PATH, d)) and d[:5].isdigit()]
+next_num = max([int(d[:5]) for d in existing], default=-1) + 1
+SWEEP_DATA_PATH = os.path.join(DATA_PATH, f"{next_num:05d}_{folder_suffix}")
+os.makedirs(SWEEP_DATA_PATH)
+print('saving into ' + SWEEP_DATA_PATH)
 
 for q_time in q_times:
 
@@ -339,7 +352,7 @@ for q_time in q_times:
     device.awgs[awgs[awg_index]].enable(1) ### run the sequence. ## is this a command in core?
     
 
-    qubit_freqs = fast_flux_qubit_spec(q_time, ff_length)
+    qubit_freqs = fast_flux_qubit_spec(q_time, ff_length, readout_delay)
     print('q_time = ' + str(q_time) + ' us')
 
 # make sure channels are off

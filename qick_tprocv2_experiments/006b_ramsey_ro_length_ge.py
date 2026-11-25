@@ -105,7 +105,7 @@ class RamseyProgram(AveragerProgramV2):
     def _body(self, cfg):
         self.pulse(ch=self.cfg["qubit_ch"], name="ramsey1", t=0)  #play probe pulse
         
-        self.delay_auto(cfg['wait_time']+0.01, tag='wait') # wait_time after last pulse
+        self.delay_auto(cfg['wait_time'], tag='wait') # wait_time after last pulse
         
         self.pulse(ch=self.cfg["qubit_ch"], name="ramsey2", t=0)  #play pulse
         self.delay_auto(0.01) # wait_time after last pulse
@@ -118,7 +118,7 @@ class RamseyProgram(AveragerProgramV2):
 ###################
 
 # Hardcoded for now - the readout durations (us) to step through
-RO_LENGTHS = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0]
+RO_LENGTHS = [_ + 1 for _ in range(10)]
 
 # res_length_ge is held this far above ro_length on every pass, so the readout
 # pulse always outlasts the acquisition window by a fixed margin.
